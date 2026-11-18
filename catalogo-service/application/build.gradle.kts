@@ -1,4 +1,7 @@
+plugins {
+    id("mini.application")
+}
+
 dependencies {
-    "implementation"(project(":shared-kernel"))
-    "implementation"(project(":catalogo-service:domain"))
+    api(project(":catalogo-service:domain"))
 }
