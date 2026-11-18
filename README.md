@@ -38,7 +38,7 @@ Cada módulo declara o próprio papel com um convention plugin. Módulos `mini.d
 
 ```bash
 cp infra/.env.example infra/.env
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d --wait   # espera todos os healthchecks
 ./gradlew build
 ./gradlew :catalogo-service:bootstrap:bootRun
 ./gradlew :gateway:bootRun
@@ -51,6 +51,14 @@ docker compose -f infra/docker-compose.yml up -d
 | Keycloak | http://localhost:8180 | admin / admin |
 | Usuário cliente | realm `mini` | cliente@mini.dev / cliente |
 | Usuário admin | realm `mini` | admin@mini.dev / admin |
+| MySQL | localhost:3306 | um usuário por schema: `catalogo`/`catalogo`, `carrinho`/`carrinho`, … |
+| Redis | localhost:6379 | — |
+
+Para conferir que o usuário de um serviço não lê o schema de outro (ADR-0003), com a infra no ar:
+
+```powershell
+cd infra; .\verificar-isolamento.ps1
+```
 
 ## Regras da arquitetura
 
