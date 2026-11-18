@@ -20,7 +20,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # Por padrão o setup-gradle só grava cache na branch padrão. Como o CI só roda em PR (ADR-0004),
+      # sem isto o cache nunca seria gravado. O cache de um PR vale para as reexecuções do mesmo PR.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
       - name: Build e testes (inclui ArchUnit)
         run: ./gradlew build --no-daemon
       - name: Relatório de testes
