@@ -61,6 +61,7 @@ Essas regras são verificadas por ArchUnit em `*/bootstrap/src/test`.
 - [ADR-0001 Arquitetura hexagonal](docs/adr/0001-arquitetura-hexagonal.md)
 - [ADR-0002 Microfrontends em polyrepo](docs/adr/0002-microfrontends-polyrepo.md)
 - [ADR-0003 MySQL com um schema por serviço](docs/adr/0003-mysql-schema-por-servico.md)
+- [ADR-0004 Fluxo de branches com dev e CI só na entrada da main](docs/adr/0004-fluxo-de-branches-e-ci.md)
 
 ## Roadmap
 
