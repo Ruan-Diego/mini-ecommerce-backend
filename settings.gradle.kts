@@ -1,12 +1,27 @@
+pluginManagement {
+    // Convention plugins do projeto (mini.domain, mini.application, mini.spring-adapter, mini.spring-boot-app)
+    includeBuild("build-logic")
+}
+
+// Repositórios declarados uma vez para todos os módulos; um módulo não pode adicionar os seus.
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        mavenCentral()
+    }
+}
+
 rootProject.name = "mini-ecommerce-backend"
 
 include("shared-kernel")
 include("gateway")
 
-// catalogo-service: um módulo Gradle por camada da arquitetura hexagonal
-include("catalogo-service:domain")
-include("catalogo-service:application")
-include("catalogo-service:adapters")
-include("catalogo-service:bootstrap")
+// Cada serviço tem um módulo Gradle por camada da arquitetura hexagonal.
+val servicos = listOf("catalogo", "carrinho", "pedido", "pagamento", "estoque")
+val camadas = listOf("domain", "application", "adapters", "bootstrap")
 
-// carrinho, pedido, pagamento e estoque entram nas fases 2 a 4 com a mesma estrutura
+for (servico in servicos) {
+    for (camada in camadas) {
+        include("$servico-service:$camada")
+    }
+}

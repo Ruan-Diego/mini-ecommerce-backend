@@ -1,9 +1,15 @@
 name: CI
 
+# ADR-0004: CI só roda em PR para main (fim de cada fase) ou manualmente.
+# Não adicione gatilho de push nem de PR para dev/feat: a cota de Actions é limitada.
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -14,7 +20,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # Por padrão o setup-gradle só grava cache na branch padrão. Como o CI só roda em PR (ADR-0004),
+      # sem isto o cache nunca seria gravado. O cache de um PR vale para as reexecuções do mesmo PR.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
       - name: Build e testes (inclui ArchUnit)
         run: ./gradlew build --no-daemon
       - name: Relatório de testes

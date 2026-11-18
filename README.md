@@ -20,20 +20,25 @@ Java 21 · Spring Boot 3.5 · Gradle multi-module · MySQL 8 · RabbitMQ · Redi
 ## Estrutura
 
 ```
+build-logic/            Convention plugins: mini.domain, mini.application, mini.spring-adapter, mini.spring-boot-app
 shared-kernel/          Dinheiro, Id, DomainEvent, AggregateRoot (só JDK)
 gateway/                Spring Cloud Gateway (porta 8080)
 catalogo-service/       domain · application · adapters · bootstrap (porta 8081)
+carrinho-service/       idem (porta 8082)
+pedido-service/         idem (porta 8083)
+pagamento-service/      idem (porta 8084)
+estoque-service/        idem (porta 8085)
 infra/                  Docker Compose, MySQL init, realm do Keycloak
 docs/adr/               Decisões de arquitetura
 ```
 
-carrinho, pedido, pagamento e estoque entram nas fases 2 a 4, com a mesma estrutura do catálogo.
+Cada módulo declara o próprio papel com um convention plugin. Módulos `mini.domain` (o `shared-kernel` e o `domain` de cada serviço) falham no `check` se declararem qualquer dependência externa. carrinho, pedido, pagamento e estoque já existem como esqueleto; o código de cada um entra nas fases 2 a 4.
 
 ## Rodando localmente
 
 ```bash
 cp infra/.env.example infra/.env
-docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml up -d --wait   # espera todos os healthchecks
 ./gradlew build
 ./gradlew :catalogo-service:bootstrap:bootRun
 ./gradlew :gateway:bootRun
@@ -46,6 +51,14 @@ docker compose -f infra/docker-compose.yml up -d
 | Keycloak | http://localhost:8180 | admin / admin |
 | Usuário cliente | realm `mini` | cliente@mini.dev / cliente |
 | Usuário admin | realm `mini` | admin@mini.dev / admin |
+| MySQL | localhost:3306 | um usuário por schema: `catalogo`/`catalogo`, `carrinho`/`carrinho`, … |
+| Redis | localhost:6379 | — |
+
+Para conferir que o usuário de um serviço não lê o schema de outro (ADR-0003), com a infra no ar:
+
+```powershell
+cd infra; .\verificar-isolamento.ps1
+```
 
 ## Regras da arquitetura
 
@@ -61,6 +74,7 @@ Essas regras são verificadas por ArchUnit em `*/bootstrap/src/test`.
 - [ADR-0001 Arquitetura hexagonal](docs/adr/0001-arquitetura-hexagonal.md)
 - [ADR-0002 Microfrontends em polyrepo](docs/adr/0002-microfrontends-polyrepo.md)
 - [ADR-0003 MySQL com um schema por serviço](docs/adr/0003-mysql-schema-por-servico.md)
+- [ADR-0004 Fluxo de branches com dev e CI só na entrada da main](docs/adr/0004-fluxo-de-branches-e-ci.md)
 
 ## Roadmap
 
