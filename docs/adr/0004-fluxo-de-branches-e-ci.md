@@ -23,4 +23,5 @@ O projeto tem 63 issues em 8 repositórios. A cota de minutos do GitHub Actions 
 - O CI roda uma vez por fase em cada repositório (mais as reexecuções se o PR da fase precisar de correção). A cota de Actions dura o projeto inteiro.
 - Os testes nas features e na `dev` são responsabilidade local: nenhuma feature é mesclada na `dev` sem os testes do repositório passando na máquina.
 - Um erro que só aparece no runner do Actions (Testcontainers, cache, sistema operacional) é descoberto só no fim da fase. Se precisar, dá para disparar o CI manualmente na `dev` pelo `workflow_dispatch`.
+- O cache do Actions criado num PR só vale para aquele PR: as reexecuções do PR de uma fase aproveitam o cache, mas o PR da fase seguinte começa sem cache. O backend usa `cache-read-only: false` no `setup-gradle` para conseguir gravar cache fora da branch padrão.
 - Issues só fecham automaticamente quando a fase chega na `main` (o GitHub só aplica `Closes #n` na branch padrão). Até lá, o progresso fica no `ROADMAP.md` e nos PRs para `dev`.
