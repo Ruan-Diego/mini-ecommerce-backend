@@ -20,14 +20,19 @@ Java 21 · Spring Boot 3.5 · Gradle multi-module · MySQL 8 · RabbitMQ · Redi
 ## Estrutura
 
 ```
+build-logic/            Convention plugins: mini.domain, mini.application, mini.spring-adapter, mini.spring-boot-app
 shared-kernel/          Dinheiro, Id, DomainEvent, AggregateRoot (só JDK)
 gateway/                Spring Cloud Gateway (porta 8080)
 catalogo-service/       domain · application · adapters · bootstrap (porta 8081)
+carrinho-service/       idem (porta 8082)
+pedido-service/         idem (porta 8083)
+pagamento-service/      idem (porta 8084)
+estoque-service/        idem (porta 8085)
 infra/                  Docker Compose, MySQL init, realm do Keycloak
 docs/adr/               Decisões de arquitetura
 ```
 
-carrinho, pedido, pagamento e estoque entram nas fases 2 a 4, com a mesma estrutura do catálogo.
+Cada módulo declara o próprio papel com um convention plugin. Módulos `mini.domain` (o `shared-kernel` e o `domain` de cada serviço) falham no `check` se declararem qualquer dependência externa. carrinho, pedido, pagamento e estoque já existem como esqueleto; o código de cada um entra nas fases 2 a 4.
 
 ## Rodando localmente
 

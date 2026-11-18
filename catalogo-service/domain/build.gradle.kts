@@ -1,4 +1,8 @@
-// Domínio puro: nada de Spring, JPA ou Jackson aqui.
+// Domínio puro: nada de Spring, JPA ou Jackson aqui (verificado por verificarSoJdk e pelo ArchUnit).
+plugins {
+    id("mini.domain")
+}
+
 dependencies {
-    "implementation"(project(":shared-kernel"))
+    api(project(":shared-kernel"))
 }
