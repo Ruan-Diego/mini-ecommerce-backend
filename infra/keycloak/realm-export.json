@@ -1,0 +1,52 @@
+{
+  "realm": "mini",
+  "enabled": true,
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "cliente", "description": "Cliente da loja" },
+      { "name": "admin", "description": "Administrador da loja" }
+    ]
+  },
+  "defaultRoles": ["cliente"],
+  "clients": [
+    {
+      "clientId": "shell",
+      "name": "Shell (frontend)",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    },
+    {
+      "clientId": "api",
+      "name": "API (resource server)",
+      "bearerOnly": true
+    }
+  ],
+  "users": [
+    {
+      "username": "cliente@mini.dev",
+      "email": "cliente@mini.dev",
+      "firstName": "Ana",
+      "lastName": "Souza",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "cliente", "temporary": false }],
+      "realmRoles": ["cliente"]
+    },
+    {
+      "username": "admin@mini.dev",
+      "email": "admin@mini.dev",
+      "firstName": "Admin",
+      "lastName": "Mini",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+      "realmRoles": ["cliente", "admin"]
+    }
+  ]
+}

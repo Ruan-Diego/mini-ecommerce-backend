@@ -1,0 +1,67 @@
+# mini-ecommerce-backend
+
+Backend do **Mini E-commerce**, um projeto de estudo de **arquitetura hexagonal** e **microfrontends**.
+
+Java 21 · Spring Boot 3.5 · Gradle multi-module · MySQL 8 · RabbitMQ · Redis · Keycloak · Spring Cloud Gateway
+
+## Repositórios do projeto
+
+| Repositório | Papel |
+| --- | --- |
+| **mini-ecommerce-backend** (este) | Gateway, serviços hexagonais e infra local |
+| [mini-ecommerce-ui](https://github.com/Ruan-Diego/mini-ecommerce-ui) | Design-system e contratos de eventos |
+| [mini-ecommerce-shell](https://github.com/Ruan-Diego/mini-ecommerce-shell) | Host dos microfrontends |
+| [mini-ecommerce-mfe-catalogo](https://github.com/Ruan-Diego/mini-ecommerce-mfe-catalogo) | Home, listagem e detalhe do produto |
+| [mini-ecommerce-mfe-carrinho](https://github.com/Ruan-Diego/mini-ecommerce-mfe-carrinho) | Mini-carrinho e carrinho |
+| [mini-ecommerce-mfe-checkout](https://github.com/Ruan-Diego/mini-ecommerce-mfe-checkout) | Checkout, Pix e confirmação |
+| [mini-ecommerce-mfe-conta](https://github.com/Ruan-Diego/mini-ecommerce-mfe-conta) | Conta e pedidos do cliente |
+| [mini-ecommerce-mfe-admin](https://github.com/Ruan-Diego/mini-ecommerce-mfe-admin) | Painel administrativo |
+
+## Estrutura
+
+```
+shared-kernel/          Dinheiro, Id, DomainEvent, AggregateRoot (só JDK)
+gateway/                Spring Cloud Gateway (porta 8080)
+catalogo-service/       domain · application · adapters · bootstrap (porta 8081)
+infra/                  Docker Compose, MySQL init, realm do Keycloak
+docs/adr/               Decisões de arquitetura
+```
+
+carrinho, pedido, pagamento e estoque entram nas fases 2 a 4, com a mesma estrutura do catálogo.
+
+## Rodando localmente
+
+```bash
+cp infra/.env.example infra/.env
+docker compose -f infra/docker-compose.yml up -d
+./gradlew build
+./gradlew :catalogo-service:bootstrap:bootRun
+./gradlew :gateway:bootRun
+```
+
+| Serviço | Endereço | Acesso |
+| --- | --- | --- |
+| Gateway | http://localhost:8080 | — |
+| RabbitMQ | http://localhost:15672 | guest / guest |
+| Keycloak | http://localhost:8180 | admin / admin |
+| Usuário cliente | realm `mini` | cliente@mini.dev / cliente |
+| Usuário admin | realm `mini` | admin@mini.dev / admin |
+
+## Regras da arquitetura
+
+- `domain` só depende do JDK e do `shared-kernel`.
+- `application` depende do `domain`, nunca de `adapters`.
+- Cada port de saída tem um adapter real e um em memória para testes.
+- Eventos são publicados depois do commit, via transactional outbox.
+
+Essas regras são verificadas por ArchUnit em `*/bootstrap/src/test`.
+
+## Decisões
+
+- [ADR-0001 Arquitetura hexagonal](docs/adr/0001-arquitetura-hexagonal.md)
+- [ADR-0002 Microfrontends em polyrepo](docs/adr/0002-microfrontends-polyrepo.md)
+- [ADR-0003 MySQL com um schema por serviço](docs/adr/0003-mysql-schema-por-servico.md)
+
+## Roadmap
+
+O trabalho está organizado em milestones (Fase 0 a Fase 6) e issues neste repositório e nos repositórios de frontend.
