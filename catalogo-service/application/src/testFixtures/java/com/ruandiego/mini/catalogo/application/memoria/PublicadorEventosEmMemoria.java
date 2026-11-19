@@ -16,6 +16,10 @@ public class PublicadorEventosEmMemoria implements PublicadorEventos {
         publicados.addAll(eventos);
     }
 
+    public void limpar() {
+        publicados.clear();
+    }
+
     public List<DomainEvent> publicados() {
         return List.copyOf(publicados);
     }
