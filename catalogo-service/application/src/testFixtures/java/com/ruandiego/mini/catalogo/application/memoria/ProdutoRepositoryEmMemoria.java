@@ -27,6 +27,11 @@ public class ProdutoRepositoryEmMemoria implements ProdutoRepository {
 
     private final Map<ProdutoId, Produto> dados = new LinkedHashMap<>();
 
+    /** Para testes que reaproveitam a mesma instância (ex.: bean num contexto Spring de teste). */
+    public void limpar() {
+        dados.clear();
+    }
+
     @Override
     public void salvar(Produto produto) {
         dados.put(produto.id(), copiar(produto));

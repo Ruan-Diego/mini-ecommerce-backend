@@ -15,6 +15,11 @@ public class CategoriaRepositoryEmMemoria implements CategoriaRepository {
 
     private final Map<CategoriaId, Categoria> dados = new LinkedHashMap<>();
 
+    /** Para testes que reaproveitam a mesma instância (ex.: bean num contexto Spring de teste). */
+    public void limpar() {
+        dados.clear();
+    }
+
     @Override
     public void salvar(Categoria categoria) {
         dados.put(categoria.id(), copiar(categoria));
