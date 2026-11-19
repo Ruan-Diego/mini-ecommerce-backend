@@ -27,16 +27,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GatewayRotasTest {
 
     private static final AtomicReference<String> CAMINHO_RECEBIDO = new AtomicReference<>();
-    private static final HttpServer CATALOGO_FALSO = catalogoFalso();
+    private static final HttpServer CATALOGO_FALSO = servidorFalso(CAMINHO_RECEBIDO);
+    private static final AtomicReference<String> CARRINHO_RECEBIDO = new AtomicReference<>();
+    private static final HttpServer CARRINHO_FALSO = servidorFalso(CARRINHO_RECEBIDO);
 
     @DynamicPropertySource
     static void apontarParaOCatalogoFalso(DynamicPropertyRegistry registro) {
         registro.add("CATALOGO_URL", () -> "http://localhost:" + CATALOGO_FALSO.getAddress().getPort());
+        registro.add("CARRINHO_URL", () -> "http://localhost:" + CARRINHO_FALSO.getAddress().getPort());
     }
 
     @AfterAll
     static void pararCatalogoFalso() {
         CATALOGO_FALSO.stop(0);
+        CARRINHO_FALSO.stop(0);
     }
 
     @Autowired
@@ -48,7 +52,28 @@ class GatewayRotasTest {
                 .expectStatus().isOk()
                 .expectBody(String.class).isEqualTo("{\"itens\":[]}");
 
-        assertThat(CAMINHO_RECEBIDO.get()).isEqualTo("/produtos?ordem=menor-preco");
+        assertThat(CAMINHO_RECEBIDO.get()).isEqualTo("GET /produtos?ordem=menor-preco sessao=null");
+    }
+
+    @Test
+    void repassaParaOCarrinhoSemOPrefixoERepassaOHeaderDaSessao() {
+        cliente.put().uri("/api/carrinho/carrinhos/atual/itens/abc")
+                .header("X-Sessao-Id", "sessao-1")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(CARRINHO_RECEBIDO.get()).isEqualTo("PUT /carrinhos/atual/itens/abc sessao=sessao-1");
+    }
+
+    @Test
+    void liberaCorsDoCarrinhoParaMetodosEHeadersDaSessao() {
+        cliente.options().uri("/api/carrinho/carrinhos/atual/itens/abc")
+                .header(HttpHeaders.ORIGIN, "http://localhost:5175")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.DELETE.name())
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "x-sessao-id,content-type")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:5175");
     }
 
     @Test
@@ -78,11 +103,11 @@ class GatewayRotasTest {
                 .expectBody().jsonPath("$.status").isEqualTo("UP");
     }
 
-    private static HttpServer catalogoFalso() {
+    private static HttpServer servidorFalso(AtomicReference<String> caminhoRecebido) {
         try {
             HttpServer servidor = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
             servidor.createContext("/", troca -> {
-                CAMINHO_RECEBIDO.set(troca.getRequestURI().toString());
+                caminhoRecebido.set(troca.getRequestMethod() + " " + troca.getRequestURI() + " sessao=" + troca.getRequestHeaders().getFirst("X-Sessao-Id"));
                 byte[] corpo = "{\"itens\":[]}".getBytes(StandardCharsets.UTF_8);
                 troca.getResponseHeaders().add("Content-Type", "application/json");
                 troca.sendResponseHeaders(200, corpo.length);

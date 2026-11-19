@@ -10,6 +10,7 @@ import com.ruandiego.mini.catalogo.application.port.out.ProdutoRepository;
 import com.ruandiego.mini.catalogo.domain.model.Categoria;
 import com.ruandiego.mini.catalogo.domain.model.CategoriaId;
 import com.ruandiego.mini.catalogo.domain.model.Produto;
+import com.ruandiego.mini.catalogo.domain.model.ProdutoId;
 import com.ruandiego.mini.catalogo.domain.model.Slug;
 
 import java.text.Collator;
@@ -58,6 +59,13 @@ public class ConsultaCatalogoService implements BuscarProdutosUseCase, ObterProd
         return produtos.buscarPorSlug(slug)
                 .filter(Produto::visivelNaVitrine)
                 .orElseThrow(() -> new NaoEncontradoException("produto não encontrado: " + slug));
+    }
+
+    @Override
+    public Produto obterPorId(ProdutoId id) {
+        return produtos.buscarPorId(id)
+                .filter(Produto::visivelNaVitrine)
+                .orElseThrow(() -> new NaoEncontradoException("produto não encontrado: " + id));
     }
 
     @Override
