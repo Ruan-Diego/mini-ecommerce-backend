@@ -13,6 +13,8 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")
+    // Eventos do catálogo (PrecoAlterado): RabbitMQ.
+    implementation("org.springframework.boot:spring-boot-starter-amqp")
     // Carrinho de visitante: Redis (com expiração).
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
