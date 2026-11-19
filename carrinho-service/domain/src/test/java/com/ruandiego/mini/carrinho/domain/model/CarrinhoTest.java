@@ -325,6 +325,93 @@ class CarrinhoTest {
         }
     }
 
+    @Nested
+    class Uniao {
+
+        private Carrinho visitante() {
+            Carrinho v = Carrinho.criar();
+            v.adicionarItem(ESFERA, "Esfera Chrome", Dinheiro.de("90.00"), 3);
+            return v;
+        }
+
+        @Test
+        void itemSoDoVisitanteEntraNoCarrinhoDoCliente() {
+            Carrinho cliente = Carrinho.criar();
+            cliente.adicionarItem(CUBO, "Cubo Preto", Dinheiro.de("50.00"), 1);
+
+            cliente.unirCom(visitante(), AGORA);
+
+            assertThat(cliente.itens()).hasSize(2);
+            assertThat(cliente.subtotal()).isEqualTo(Dinheiro.de("320.00"));
+        }
+
+        @Test
+        void produtoNosDoisSomaQuantidadesEMantemOPrecoDoCliente() {
+            Carrinho cliente = Carrinho.criar();
+            cliente.adicionarItem(ESFERA, "Esfera Chrome", Dinheiro.de("100.00"), 2);
+
+            cliente.unirCom(visitante(), AGORA);
+
+            assertThat(cliente.itens()).hasSize(1);
+            assertThat(cliente.itens().get(0).quantidade()).isEqualTo(5);
+            assertThat(cliente.itens().get(0).precoUnitario()).isEqualTo(Dinheiro.de("100.00"));
+        }
+
+        @Test
+        void somaAcimaDeDezEhCortadaNoTetoSemFalhar() {
+            Carrinho cliente = Carrinho.criar();
+            cliente.adicionarItem(ESFERA, "Esfera Chrome", Dinheiro.de("100.00"), 9);
+
+            cliente.unirCom(visitante(), AGORA);
+
+            assertThat(cliente.itens().get(0).quantidade()).isEqualTo(10);
+        }
+
+        @Test
+        void cupomDoClientePrevalece() {
+            Carrinho cliente = Carrinho.criar();
+            cliente.adicionarItem(CUBO, "Cubo Preto", Dinheiro.de("50.00"), 1);
+            cliente.aplicarCupom(Cupom.percentual("CLIENTE", 5, FUTURO, null), AGORA);
+            Carrinho v = visitante();
+            v.aplicarCupom(Cupom.percentual("VISITANTE", 50, FUTURO, null), AGORA);
+
+            cliente.unirCom(v, AGORA);
+
+            assertThat(cliente.cupom().codigo()).isEqualTo("CLIENTE");
+        }
+
+        @Test
+        void semCupomNoClienteAdotaOCupomDoVisitante() {
+            Carrinho cliente = Carrinho.criar();
+            Carrinho v = visitante();
+            v.aplicarCupom(Cupom.percentual("VISITANTE", 10, FUTURO, null), AGORA);
+
+            cliente.unirCom(v, AGORA);
+
+            assertThat(cliente.cupom().codigo()).isEqualTo("VISITANTE");
+        }
+
+        @Test
+        void cupomDoVisitanteVencidoNaoEhAdotado() {
+            Carrinho cliente = Carrinho.criar();
+            Carrinho v = visitante();
+            v.aplicarCupom(Cupom.percentual("VISITANTE", 10, AGORA.plusSeconds(10), null), AGORA);
+
+            cliente.unirCom(v, AGORA.plusSeconds(11));
+
+            assertThat(cliente.cupom()).isNull();
+        }
+
+        @Test
+        void unirComOProprioCarrinhoNaoFazNada() {
+            Carrinho c = comEsferaECubo();
+
+            c.unirCom(c, AGORA);
+
+            assertThat(c.subtotal()).isEqualTo(Dinheiro.de("250.00"));
+        }
+    }
+
     @Test
     void reconstituirRecalculaOSubtotalEMantemOCupom() {
         Carrinho original = comEsferaECubo();

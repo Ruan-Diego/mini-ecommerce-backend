@@ -99,6 +99,36 @@ public class Carrinho extends AggregateRoot {
         this.cupom = null;
     }
 
+    /**
+     * Junta o carrinho de visitante a este (o do cliente logado). Regras:
+     *  - produto que só existe no visitante entra como está;
+     *  - produto nos dois soma as quantidades, limitado a 10 (juntar não deve falhar: o cliente
+     *    não fez nada de errado, então a quantidade é cortada no teto);
+     *  - preço do item que já estava no carrinho do cliente é mantido;
+     *  - o cupom do cliente prevalece; sem cupom, adota o do visitante se ainda for aplicável.
+     */
+    public void unirCom(Carrinho visitante, Instant agora) {
+        Objects.requireNonNull(visitante, "visitante");
+        Objects.requireNonNull(agora, "agora");
+        if (visitante == this) {
+            return;
+        }
+        for (ItemCarrinho item : visitante.itens()) {
+            ItemCarrinho existente = itens.get(item.produtoId());
+            if (existente == null) {
+                itens.put(item.produtoId(), item);
+            } else {
+                int soma = Math.min(ItemCarrinho.QUANTIDADE_MAXIMA, existente.quantidade() + item.quantidade());
+                itens.put(item.produtoId(), existente.comQuantidade(soma));
+            }
+        }
+        recalcular();
+        Cupom doVisitante = visitante.cupom;
+        if (cupom == null && doVisitante != null && doVisitante.aplicavelA(subtotal, agora)) {
+            cupom = doVisitante;
+        }
+    }
+
     /** Esvazia itens e cupom (evento carrinho:limpo, após a compra). */
     public void esvaziar() {
         itens.clear();
