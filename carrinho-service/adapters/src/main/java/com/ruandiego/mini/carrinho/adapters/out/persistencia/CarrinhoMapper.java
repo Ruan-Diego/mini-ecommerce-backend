@@ -21,7 +21,7 @@ final class CarrinhoMapper {
         return new CarrinhoJpa(carrinho.id().toString(), cliente.valor(), carrinho.cupom(),
                 carrinho.itens().stream()
                         .map(i -> new ItemCarrinhoJpa(i.produtoId().toString(), i.nome(), i.precoUnitario().valor(),
-                                i.quantidade()))
+                                i.quantidade(), i.precoAnterior() == null ? null : i.precoAnterior().valor()))
                         .toList());
     }
 
@@ -32,7 +32,8 @@ final class CarrinhoMapper {
         return Carrinho.reconstituir(CarrinhoId.de(jpa.getId()),
                 jpa.getItens().stream()
                         .map(i -> new ItemCarrinho(ProdutoId.de(i.getProdutoId()), i.getNome(),
-                                new Dinheiro(i.getPrecoUnitario()), i.getQuantidade()))
+                                new Dinheiro(i.getPrecoUnitario()), i.getQuantidade(),
+                                i.getPrecoAnterior() == null ? null : new Dinheiro(i.getPrecoAnterior())))
                         .toList(),
                 cupom);
     }

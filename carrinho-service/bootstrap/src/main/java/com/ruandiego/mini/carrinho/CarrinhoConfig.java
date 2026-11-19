@@ -4,6 +4,7 @@ import com.ruandiego.mini.carrinho.application.port.out.CarrinhoClienteRepositor
 import com.ruandiego.mini.carrinho.application.port.out.CarrinhoVisitanteRepository;
 import com.ruandiego.mini.carrinho.application.port.out.CatalogoProdutos;
 import com.ruandiego.mini.carrinho.application.port.out.CupomRepository;
+import com.ruandiego.mini.carrinho.application.port.out.PrecosJaProcessados;
 import com.ruandiego.mini.carrinho.application.service.CarrinhoService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,7 +29,8 @@ class CarrinhoConfig {
     /** Implementa todos os use cases do carrinho (ObterCarrinho, AdicionarItem, UnirCarrinhos, ...). */
     @Bean
     CarrinhoService carrinhoService(CarrinhoVisitanteRepository visitantes, CarrinhoClienteRepository clientes,
-                                    CupomRepository cupons, CatalogoProdutos catalogo, Clock relogio) {
-        return new CarrinhoService(visitantes, clientes, cupons, catalogo, relogio);
+                                    CupomRepository cupons, CatalogoProdutos catalogo, PrecosJaProcessados processados,
+                                    Clock relogio) {
+        return new CarrinhoService(visitantes, clientes, cupons, catalogo, processados, relogio);
     }
 }

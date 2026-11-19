@@ -45,6 +45,7 @@ class CarrinhoVisitanteRepositoryRedisTest extends CarrinhoVisitanteRepositoryCo
     @AfterEach
     void limpar() {
         redis.delete(redis.keys(CarrinhoVisitanteRepositoryRedis.PREFIXO + "*"));
+        redis.delete(redis.keys(CarrinhoVisitanteRepositoryRedis.PREFIXO_PRODUTO + "*"));
     }
 
     private static Carrinho comUmItem() {
@@ -71,6 +72,18 @@ class CarrinhoVisitanteRepositoryRedisTest extends CarrinhoVisitanteRepositoryCo
         repositorio().salvar(SESSAO, comUmItem());
 
         assertThat(redis.getExpire(chave)).isGreaterThan(Duration.ofDays(6).toSeconds());
+    }
+
+    @Test
+    void indiceDeProdutoTambemExpiraEIncluiASessao() {
+        Carrinho carrinho = comUmItem();
+        ProdutoId produto = carrinho.itens().get(0).produtoId();
+
+        repositorio().salvar(SESSAO, carrinho);
+
+        String indice = CarrinhoVisitanteRepositoryRedis.chaveProduto(produto);
+        assertThat(redis.opsForSet().isMember(indice, SESSAO.valor())).isTrue();
+        assertThat(redis.getExpire(indice)).isGreaterThan(Duration.ofDays(6).toSeconds());
     }
 
     @Test

@@ -15,12 +15,17 @@ import java.util.List;
 public record CarrinhoResposta(List<ItemResposta> itens, int quantidadeTotal, BigDecimal subtotal,
                                CupomResposta cupom, BigDecimal desconto, BigDecimal total) {
 
+    /**
+     * {@code precoAlterado} e {@code precoAnterior} são o aviso de mudança de preço: o valor que o cliente
+     * tinha visto (nulo quando o preço não mudou) e o valor atual está em {@code precoUnitario}.
+     */
     public record ItemResposta(String produtoId, String nome, BigDecimal precoUnitario, int quantidade,
-                               BigDecimal subtotal) {
+                               BigDecimal subtotal, boolean precoAlterado, BigDecimal precoAnterior) {
 
         static ItemResposta de(ItemCarrinho item) {
             return new ItemResposta(item.produtoId().toString(), item.nome(), item.precoUnitario().valor(),
-                    item.quantidade(), item.subtotal().valor());
+                    item.quantidade(), item.subtotal().valor(), item.precoAlterado(),
+                    item.precoAnterior() == null ? null : item.precoAnterior().valor());
         }
     }
 

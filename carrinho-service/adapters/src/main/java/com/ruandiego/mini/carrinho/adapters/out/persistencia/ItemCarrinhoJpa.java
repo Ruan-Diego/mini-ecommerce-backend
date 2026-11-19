@@ -21,15 +21,21 @@ class ItemCarrinhoJpa {
     @Column(nullable = false)
     private int quantidade;
 
+    /** Aviso de mudança de preço: o valor visto antes. Nulo se o preço não mudou. */
+    @Column(name = "preco_anterior", precision = 12, scale = 2)
+    private BigDecimal precoAnterior;
+
     protected ItemCarrinhoJpa() {
         // exigido pelo JPA
     }
 
-    ItemCarrinhoJpa(String produtoId, String nome, BigDecimal precoUnitario, int quantidade) {
+    ItemCarrinhoJpa(String produtoId, String nome, BigDecimal precoUnitario, int quantidade,
+                    BigDecimal precoAnterior) {
         this.produtoId = produtoId;
         this.nome = nome;
         this.precoUnitario = precoUnitario;
         this.quantidade = quantidade;
+        this.precoAnterior = precoAnterior;
     }
 
     String getProdutoId() {
@@ -46,5 +52,9 @@ class ItemCarrinhoJpa {
 
     int getQuantidade() {
         return quantidade;
+    }
+
+    BigDecimal getPrecoAnterior() {
+        return precoAnterior;
     }
 }

@@ -3,9 +3,11 @@ package com.ruandiego.mini.carrinho.adapters.out.persistencia;
 import com.ruandiego.mini.carrinho.application.port.out.CarrinhoClienteRepository;
 import com.ruandiego.mini.carrinho.domain.model.Carrinho;
 import com.ruandiego.mini.carrinho.domain.model.ClienteId;
+import com.ruandiego.mini.carrinho.domain.model.ProdutoId;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -27,6 +29,12 @@ public class CarrinhoClienteRepositoryJpa implements CarrinhoClienteRepository {
     @Transactional(readOnly = true)
     public Optional<Carrinho> buscar(ClienteId cliente) {
         return jpa.findByClienteId(cliente.valor()).map(CarrinhoMapper::paraDominio);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ClienteId> clientesComProduto(ProdutoId produto) {
+        return jpa.findClienteIdsByProdutoId(produto.toString()).stream().map(ClienteId::new).toList();
     }
 
     @Override
