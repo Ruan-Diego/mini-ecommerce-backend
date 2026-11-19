@@ -7,6 +7,7 @@ import com.ruandiego.mini.carrinho.application.memoria.CarrinhoClienteRepository
 import com.ruandiego.mini.carrinho.application.memoria.CarrinhoVisitanteRepositoryEmMemoria;
 import com.ruandiego.mini.carrinho.application.memoria.CatalogoProdutosEmMemoria;
 import com.ruandiego.mini.carrinho.application.memoria.CupomRepositoryEmMemoria;
+import com.ruandiego.mini.carrinho.application.memoria.PrecosJaProcessadosEmMemoria;
 import com.ruandiego.mini.carrinho.application.port.out.CatalogoProdutos;
 import com.ruandiego.mini.carrinho.domain.RegraDeNegocioException;
 import com.ruandiego.mini.carrinho.domain.model.ClienteId;
@@ -40,6 +41,7 @@ class CarrinhoServiceTest {
     private final CarrinhoClienteRepositoryEmMemoria clientes = new CarrinhoClienteRepositoryEmMemoria();
     private final CupomRepositoryEmMemoria cupons = new CupomRepositoryEmMemoria();
     private final CatalogoProdutosEmMemoria catalogo = new CatalogoProdutosEmMemoria();
+    private final PrecosJaProcessadosEmMemoria processados = new PrecosJaProcessadosEmMemoria();
     private CarrinhoService service;
 
     @BeforeEach
@@ -49,7 +51,8 @@ class CarrinhoServiceTest {
         cupons.adicionar(Cupom.percentual("DEZ", 10, AGORA.plusSeconds(3600), null));
         cupons.adicionar(Cupom.percentual("VENCIDO", 10, AGORA.minusSeconds(1), null));
         cupons.adicionar(Cupom.percentual("GRANDE", 10, AGORA.plusSeconds(3600), Dinheiro.de("1000.00")));
-        service = new CarrinhoService(visitantes, clientes, cupons, catalogo, Clock.fixed(AGORA, ZoneOffset.UTC));
+        service = new CarrinhoService(visitantes, clientes, cupons, catalogo, processados,
+                Clock.fixed(AGORA, ZoneOffset.UTC));
     }
 
     @Test
@@ -207,10 +210,80 @@ class CarrinhoServiceTest {
         carrinho.aplicarCupom(Cupom.percentual("CURTO", 10, AGORA, null), AGORA.minusSeconds(60));
         clientes.salvar(ANA, carrinho);
         Clock depois = Clock.fixed(AGORA.plusSeconds(1), ZoneOffset.UTC);
-        CarrinhoService tardio = new CarrinhoService(visitantes, clientes, cupons, catalogo, depois);
+        CarrinhoService tardio = new CarrinhoService(visitantes, clientes, cupons, catalogo, processados, depois);
 
         assertThatThrownBy(() -> tardio.iniciar(ANA))
                 .isInstanceOf(RegraDeNegocioException.class)
                 .hasMessageContaining("CURTO");
+    }
+
+    @Test
+    void mudancaDePrecoChegaAosCarrinhosDeClienteEDeVisitanteComAvisoDoValorAntigo() {
+        service.adicionar(CLIENTE, ESFERA, 2);
+        service.adicionar(VISITANTE, ESFERA, 1);
+        service.adicionar(VISITANTE, CUBO, 1);
+
+        service.atualizar(ESFERA, Dinheiro.de("120.00"), AGORA);
+
+        var doCliente = service.obter(CLIENTE).itens().get(0);
+        assertThat(doCliente.precoUnitario()).isEqualTo(Dinheiro.de("120.00"));
+        assertThat(doCliente.precoAnterior()).isEqualTo(Dinheiro.de("100.00"));
+        var doVisitante = service.obter(VISITANTE);
+        assertThat(doVisitante.itens().get(0).precoAnterior()).isEqualTo(Dinheiro.de("100.00"));
+        assertThat(doVisitante.itens().get(1).precoAlterado()).isFalse();
+        assertThat(doVisitante.subtotal()).isEqualTo(Dinheiro.de("170.00"));
+    }
+
+    @Test
+    void mesmaMensagemDuasVezesTemOEfeitoDeUma() {
+        service.adicionar(CLIENTE, ESFERA, 1);
+
+        service.atualizar(ESFERA, Dinheiro.de("120.00"), AGORA);
+        service.atualizar(ESFERA, Dinheiro.de("120.00"), AGORA);
+
+        var item = service.obter(CLIENTE).itens().get(0);
+        assertThat(item.precoUnitario()).isEqualTo(Dinheiro.de("120.00"));
+        assertThat(item.precoAnterior()).isEqualTo(Dinheiro.de("100.00"));
+    }
+
+    @Test
+    void mensagemAntigaQueChegaDepoisDeUmaNovaEhDescartada() {
+        service.adicionar(CLIENTE, ESFERA, 1);
+
+        service.atualizar(ESFERA, Dinheiro.de("130.00"), AGORA.plusSeconds(60));
+        service.atualizar(ESFERA, Dinheiro.de("110.00"), AGORA);
+
+        assertThat(service.obter(CLIENTE).itens().get(0).precoUnitario()).isEqualTo(Dinheiro.de("130.00"));
+    }
+
+    @Test
+    void duasMudancasEmOrdemMantemOPrimeiroValorVistoNoAviso() {
+        service.adicionar(CLIENTE, ESFERA, 1);
+
+        service.atualizar(ESFERA, Dinheiro.de("110.00"), AGORA);
+        service.atualizar(ESFERA, Dinheiro.de("120.00"), AGORA.plusSeconds(1));
+
+        var item = service.obter(CLIENTE).itens().get(0);
+        assertThat(item.precoAnterior()).isEqualTo(Dinheiro.de("100.00"));
+        assertThat(item.precoUnitario()).isEqualTo(Dinheiro.de("120.00"));
+    }
+
+    @Test
+    void produtoForaDeTodosOsCarrinhosSoRegistraOEvento() {
+        service.atualizar(CUBO, Dinheiro.de("70.00"), AGORA);
+
+        assertThat(processados.jaProcessado(CUBO, AGORA)).isTrue();
+        assertThat(clientes.clientesComProduto(CUBO)).isEmpty();
+    }
+
+    @Test
+    void carrinhoSemOProdutoNaoEhRegravado() {
+        service.adicionar(VISITANTE, ESFERA, 1);
+        service.remover(VISITANTE, ESFERA);
+        // O índice do Redis pode listar sessão que já tirou o produto: o service não deve criar nada por isso.
+
+        service.atualizar(ESFERA, Dinheiro.de("120.00"), AGORA);
+
+        assertThat(service.obter(VISITANTE).itens()).isEmpty();
     }
 }

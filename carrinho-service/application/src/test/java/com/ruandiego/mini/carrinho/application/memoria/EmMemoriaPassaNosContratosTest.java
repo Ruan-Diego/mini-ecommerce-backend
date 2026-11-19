@@ -3,6 +3,8 @@ package com.ruandiego.mini.carrinho.application.memoria;
 import com.ruandiego.mini.carrinho.application.contrato.CarrinhoClienteRepositoryContrato;
 import com.ruandiego.mini.carrinho.application.contrato.CarrinhoVisitanteRepositoryContrato;
 import com.ruandiego.mini.carrinho.application.contrato.CupomRepositoryContrato;
+import com.ruandiego.mini.carrinho.application.contrato.PrecosJaProcessadosContrato;
+import com.ruandiego.mini.carrinho.application.port.out.PrecosJaProcessados;
 import com.ruandiego.mini.carrinho.application.port.out.CarrinhoClienteRepository;
 import com.ruandiego.mini.carrinho.application.port.out.CarrinhoVisitanteRepository;
 import com.ruandiego.mini.carrinho.application.port.out.CupomRepository;
@@ -28,6 +30,15 @@ class EmMemoriaPassaNosContratosTest {
 
         @Override
         protected CarrinhoClienteRepository clientes() {
+            return repositorio;
+        }
+    }
+
+    static class Processados extends PrecosJaProcessadosContrato {
+        private final PrecosJaProcessadosEmMemoria repositorio = new PrecosJaProcessadosEmMemoria();
+
+        @Override
+        protected PrecosJaProcessados processados() {
             return repositorio;
         }
     }

@@ -334,6 +334,82 @@ class CarrinhoTest {
     }
 
     @Nested
+    class MudancaDePreco {
+
+        @Test
+        void itemSemMudancaNaoTemAviso() {
+            ItemCarrinho item = comEsferaECubo().itens().get(0);
+
+            assertThat(item.precoAlterado()).isFalse();
+            assertThat(item.precoAnterior()).isNull();
+        }
+
+        @Test
+        void mudancaGuardaOValorAntigoParaOAviso() {
+            Carrinho c = comEsferaECubo();
+
+            c.atualizarPreco(ESFERA, Dinheiro.de("120.00"));
+
+            ItemCarrinho item = c.itens().get(0);
+            assertThat(item.precoAlterado()).isTrue();
+            assertThat(item.precoAnterior()).isEqualTo(Dinheiro.de("100.00"));
+            assertThat(item.precoUnitario()).isEqualTo(Dinheiro.de("120.00"));
+            assertThat(c.itens().get(1).precoAlterado()).isFalse();
+        }
+
+        @Test
+        void duasMudancasSeguidasMantemOPrimeiroValorQueOClienteViu() {
+            Carrinho c = comEsferaECubo();
+
+            c.atualizarPreco(ESFERA, Dinheiro.de("110.00"));
+            c.atualizarPreco(ESFERA, Dinheiro.de("120.00"));
+
+            assertThat(c.itens().get(0).precoAnterior()).isEqualTo(Dinheiro.de("100.00"));
+            assertThat(c.itens().get(0).precoUnitario()).isEqualTo(Dinheiro.de("120.00"));
+        }
+
+        @Test
+        void precoQueVoltaAoValorVistoApagaOAviso() {
+            Carrinho c = comEsferaECubo();
+            c.atualizarPreco(ESFERA, Dinheiro.de("120.00"));
+
+            c.atualizarPreco(ESFERA, Dinheiro.de("100.00"));
+
+            assertThat(c.itens().get(0).precoAlterado()).isFalse();
+        }
+
+        @Test
+        void mesmoPrecoNaoMudaNada() {
+            Carrinho c = comEsferaECubo();
+            c.atualizarPreco(ESFERA, Dinheiro.de("120.00"));
+            ItemCarrinho antes = c.itens().get(0);
+
+            c.atualizarPreco(ESFERA, Dinheiro.de("120.00"));
+
+            assertThat(c.itens().get(0)).isEqualTo(antes);
+        }
+
+        @Test
+        void avisoSobreviveAMudancaDeQuantidade() {
+            Carrinho c = comEsferaECubo();
+            c.atualizarPreco(ESFERA, Dinheiro.de("120.00"));
+
+            c.alterarQuantidade(ESFERA, 5);
+
+            assertThat(c.itens().get(0).precoAnterior()).isEqualTo(Dinheiro.de("100.00"));
+            assertThat(c.subtotal()).isEqualTo(Dinheiro.de("650.00"));
+        }
+
+        @Test
+        void precoNovoInvalidoEhRecusado() {
+            Carrinho c = comEsferaECubo();
+
+            assertThatThrownBy(() -> c.atualizarPreco(ESFERA, Dinheiro.ZERO)).isInstanceOf(RegraDeNegocioException.class);
+            assertThat(c.itens().get(0).precoUnitario()).isEqualTo(Dinheiro.de("100.00"));
+        }
+    }
+
+    @Nested
     class Uniao {
 
         private Carrinho visitante() {
