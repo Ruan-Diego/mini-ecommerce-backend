@@ -122,6 +122,28 @@ class VitrineControllerTest {
     }
 
     @Test
+    void detalhePeloId() throws Exception {
+        Produto chrome = produtos.buscarPorSlug(new Slug("esfera-chrome")).orElseThrow();
+
+        mvc.perform(get("/produtos/por-id/" + chrome.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(chrome.id().toString()))
+                .andExpect(jsonPath("$.nome").value("Esfera Chrome"))
+                .andExpect(jsonPath("$.preco").value(289.00));
+    }
+
+    @Test
+    void detalhePeloIdInexistenteInativoOuMalformado() throws Exception {
+        Produto chrome = produtos.buscarPorSlug(new Slug("esfera-chrome")).orElseThrow();
+        chrome.desativar();
+        produtos.salvar(chrome);
+
+        mvc.perform(get("/produtos/por-id/" + chrome.id())).andExpect(status().isNotFound());
+        mvc.perform(get("/produtos/por-id/" + java.util.UUID.randomUUID())).andExpect(status().isNotFound());
+        mvc.perform(get("/produtos/por-id/esfera-chrome")).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void produtoInexistenteEh404() throws Exception {
         mvc.perform(get("/produtos/nao-existe"))
                 .andExpect(status().isNotFound())

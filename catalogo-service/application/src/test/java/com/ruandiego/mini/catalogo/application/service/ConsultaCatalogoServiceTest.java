@@ -10,6 +10,7 @@ import com.ruandiego.mini.catalogo.domain.RegraDeNegocioException;
 import com.ruandiego.mini.catalogo.domain.model.Categoria;
 import com.ruandiego.mini.catalogo.domain.model.CategoriaId;
 import com.ruandiego.mini.catalogo.domain.model.Produto;
+import com.ruandiego.mini.catalogo.domain.model.ProdutoId;
 import com.ruandiego.mini.catalogo.domain.model.Sku;
 import com.ruandiego.mini.catalogo.domain.model.Slug;
 import com.ruandiego.mini.kernel.Dinheiro;
@@ -116,6 +117,21 @@ class ConsultaCatalogoServiceTest {
         @Test
         void obtemProdutoAtivoPeloSlug() {
             assertThat(service.obterPorSlug(new Slug("esfera-chrome")).nome()).isEqualTo("Esfera Chrome");
+        }
+
+        @Test
+        void obtemProdutoAtivoPeloId() {
+            Produto chrome = service.obterPorSlug(new Slug("esfera-chrome"));
+
+            assertThat(service.obterPorId(chrome.id()).nome()).isEqualTo("Esfera Chrome");
+        }
+
+        @Test
+        void produtoInativoOuDesconhecidoNaoEhEncontradoPeloId() {
+            Produto clay = produtos.buscarPorSlug(new Slug("anel-clay")).orElseThrow();
+
+            assertThatThrownBy(() -> service.obterPorId(clay.id())).isInstanceOf(NaoEncontradoException.class);
+            assertThatThrownBy(() -> service.obterPorId(ProdutoId.novo())).isInstanceOf(NaoEncontradoException.class);
         }
 
         @Test

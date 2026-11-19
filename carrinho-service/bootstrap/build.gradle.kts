@@ -6,4 +6,15 @@ dependencies {
     implementation(project(":carrinho-service:adapters"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-web")
+
+    // Teste de integração do serviço inteiro contra MySQL, Redis e RabbitMQ em containers.
+    // O teste confere o estado direto no Redis e no MySQL (os adapters guardam essas dependências para si).
+    testImplementation("org.springframework.boot:spring-boot-starter-amqp")
+    testImplementation("org.springframework.boot:spring-boot-starter-data-redis")
+    testImplementation("org.springframework.boot:spring-boot-starter-jdbc")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:mysql")
+    testImplementation("org.testcontainers:rabbitmq")
 }
