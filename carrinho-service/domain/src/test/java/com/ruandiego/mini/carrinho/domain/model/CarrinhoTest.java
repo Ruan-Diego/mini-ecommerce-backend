@@ -316,6 +316,14 @@ class CarrinhoTest {
         }
 
         @Test
+        void cuponsComOMesmoValorEmEscalasDiferentesSaoIguais() {
+            Cupom a = new Cupom("DEZ", Cupom.Tipo.PERCENTUAL, new java.math.BigDecimal("10"), FUTURO, null);
+            Cupom b = new Cupom("DEZ", Cupom.Tipo.PERCENTUAL, new java.math.BigDecimal("10.00"), FUTURO, Dinheiro.ZERO);
+
+            assertThat(a).isEqualTo(b);
+        }
+
+        @Test
         void cupomInvalidoNaoEhCriado() {
             assertThatThrownBy(() -> Cupom.percentual("X", 0, FUTURO, null)).isInstanceOf(RegraDeNegocioException.class);
             assertThatThrownBy(() -> Cupom.percentual("X", 101, FUTURO, null)).isInstanceOf(RegraDeNegocioException.class);
