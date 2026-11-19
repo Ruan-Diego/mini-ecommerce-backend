@@ -60,5 +60,25 @@ services:
       retries: 30
       start_period: 30s
 
+  # Perfil "apps": não sobe com a infra (docker compose up -d), só com --profile apps.
+  # Antes, gere o jar: .\gradlew.bat :gateway:bootJar
+  # Os serviços rodam no host (bootRun) durante o desenvolvimento; o gateway os alcança por host.docker.internal.
+  gateway:
+    profiles: [apps]
+    build: ../gateway
+    environment:
+      CATALOGO_URL: ${CATALOGO_URL:-http://host.docker.internal:8081}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    # A imagem temurin traz curl; -f faz o 503 (health DOWN) contar como falha.
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
 volumes:
   mysql-data:
