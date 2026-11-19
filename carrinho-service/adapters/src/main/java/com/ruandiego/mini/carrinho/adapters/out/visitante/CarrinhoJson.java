@@ -22,7 +22,7 @@ import java.util.List;
 record CarrinhoJson(String id, List<ItemJson> itens, CupomJson cupom) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record ItemJson(String produtoId, String nome, String precoUnitario, int quantidade) {
+    record ItemJson(String produtoId, String nome, String precoUnitario, int quantidade, String precoAnterior) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -34,7 +34,8 @@ record CarrinhoJson(String id, List<ItemJson> itens, CupomJson cupom) {
         return new CarrinhoJson(carrinho.id().toString(),
                 carrinho.itens().stream()
                         .map(i -> new ItemJson(i.produtoId().toString(), i.nome(),
-                                i.precoUnitario().valor().toPlainString(), i.quantidade()))
+                                i.precoUnitario().valor().toPlainString(), i.quantidade(),
+                                i.precoAnterior() == null ? null : i.precoAnterior().valor().toPlainString()))
                         .toList(),
                 cupom == null ? null
                         : new CupomJson(cupom.codigo(), cupom.tipo().name(), cupom.valor().toPlainString(),
@@ -48,7 +49,8 @@ record CarrinhoJson(String id, List<ItemJson> itens, CupomJson cupom) {
         return Carrinho.reconstituir(CarrinhoId.de(id),
                 itens.stream()
                         .map(i -> new ItemCarrinho(ProdutoId.de(i.produtoId()), i.nome(),
-                                new Dinheiro(new BigDecimal(i.precoUnitario())), i.quantidade()))
+                                new Dinheiro(new BigDecimal(i.precoUnitario())), i.quantidade(),
+                                i.precoAnterior() == null ? null : new Dinheiro(new BigDecimal(i.precoAnterior()))))
                         .toList(),
                 dominioCupom);
     }

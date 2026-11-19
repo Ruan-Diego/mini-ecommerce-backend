@@ -22,6 +22,7 @@ class MySqlDeTeste {
 
     /** Apaga os carrinhos, na ordem da chave estrangeira. Os cupons (dados de migração) e o schema ficam. */
     static void limpar(JdbcTemplate jdbc) {
+        jdbc.update("DELETE FROM preco_processado");
         jdbc.update("DELETE FROM item_carrinho");
         jdbc.update("DELETE FROM carrinho");
     }

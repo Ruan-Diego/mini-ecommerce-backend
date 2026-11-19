@@ -3,6 +3,7 @@ package com.ruandiego.mini.carrinho.application.contrato;
 import com.ruandiego.mini.carrinho.application.port.out.CarrinhoClienteRepository;
 import com.ruandiego.mini.carrinho.domain.model.Carrinho;
 import com.ruandiego.mini.carrinho.domain.model.ClienteId;
+import com.ruandiego.mini.carrinho.domain.model.ProdutoId;
 import com.ruandiego.mini.kernel.Dinheiro;
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +11,7 @@ import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositor
 import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.ESFERA;
 import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.assertIgual;
 import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.carrinhoCompleto;
+import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.carrinhoSo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -63,6 +65,40 @@ public abstract class CarrinhoClienteRepositoryContrato {
         clientes().salvar(ANA, carrinho);
 
         assertThat(clientes().buscar(ANA).orElseThrow().vazio()).isTrue();
+    }
+
+    @Test
+    void guardaOAvisoDeMudancaDePrecoDosItens() {
+        clientes().salvar(ANA, carrinhoCompleto());
+
+        Carrinho lido = clientes().buscar(ANA).orElseThrow();
+
+        assertThat(lido.itens().get(0).precoAlterado()).isFalse();
+        assertThat(lido.itens().get(1).precoAnterior()).isEqualTo(Dinheiro.de("49.90"));
+        assertThat(lido.itens().get(1).precoUnitario()).isEqualTo(Dinheiro.de("59.90"));
+    }
+
+    @Test
+    void listaOsClientesQueTemOProdutoNoCarrinho() {
+        clientes().salvar(ANA, carrinhoSo(ESFERA, "Esfera Chrome"));
+        clientes().salvar(BRUNO, carrinhoSo(CUBO, "Cubo Preto"));
+
+        assertThat(clientes().clientesComProduto(ESFERA)).containsExactly(ANA);
+        assertThat(clientes().clientesComProduto(CUBO)).containsExactly(BRUNO);
+        assertThat(clientes().clientesComProduto(new ProdutoId(java.util.UUID.randomUUID()))).isEmpty();
+    }
+
+    @Test
+    void clienteQueTirouOProdutoDeixaDeSerListado() {
+        Carrinho carrinho = carrinhoSo(ESFERA, "Esfera Chrome");
+        carrinho.adicionarItem(CUBO, "Cubo Preto", Dinheiro.de("49.90"), 1);
+        clientes().salvar(ANA, carrinho);
+
+        carrinho.removerItem(ESFERA);
+        clientes().salvar(ANA, carrinho);
+
+        assertThat(clientes().clientesComProduto(ESFERA)).isEmpty();
+        assertThat(clientes().clientesComProduto(CUBO)).containsExactly(ANA);
     }
 
     @Test

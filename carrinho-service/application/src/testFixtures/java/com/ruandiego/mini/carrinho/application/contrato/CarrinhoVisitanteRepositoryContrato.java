@@ -2,13 +2,16 @@ package com.ruandiego.mini.carrinho.application.contrato;
 
 import com.ruandiego.mini.carrinho.application.port.out.CarrinhoVisitanteRepository;
 import com.ruandiego.mini.carrinho.domain.model.Carrinho;
+import com.ruandiego.mini.carrinho.domain.model.ProdutoId;
 import com.ruandiego.mini.carrinho.domain.model.SessaoId;
 import com.ruandiego.mini.kernel.Dinheiro;
 import org.junit.jupiter.api.Test;
 
 import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.CUBO;
 import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.assertIgual;
+import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.ESFERA;
 import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.carrinhoCompleto;
+import static com.ruandiego.mini.carrinho.application.contrato.CarrinhoRepositoryContratoBase.carrinhoSo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -60,6 +63,37 @@ public abstract class CarrinhoVisitanteRepositoryContrato {
 
         assertThat(visitantes().buscar(SESSAO_A)).isEmpty();
         assertThat(visitantes().buscar(SESSAO_B)).isPresent();
+    }
+
+    @Test
+    void guardaOAvisoDeMudancaDePrecoDosItens() {
+        visitantes().salvar(SESSAO_A, carrinhoCompleto());
+
+        Carrinho lido = visitantes().buscar(SESSAO_A).orElseThrow();
+
+        assertThat(lido.itens().get(0).precoAlterado()).isFalse();
+        assertThat(lido.itens().get(1).precoAnterior()).isEqualTo(Dinheiro.de("49.90"));
+        assertThat(lido.itens().get(1).precoUnitario()).isEqualTo(Dinheiro.de("59.90"));
+    }
+
+    @Test
+    void listaAsSessoesQueTemOProdutoNoCarrinho() {
+        visitantes().salvar(SESSAO_A, carrinhoSo(ESFERA, "Esfera Chrome"));
+        visitantes().salvar(SESSAO_B, carrinhoSo(CUBO, "Cubo Preto"));
+
+        assertThat(visitantes().sessoesComProduto(ESFERA)).containsExactly(SESSAO_A);
+        assertThat(visitantes().sessoesComProduto(CUBO)).containsExactly(SESSAO_B);
+        assertThat(visitantes().sessoesComProduto(new ProdutoId(java.util.UUID.randomUUID()))).isEmpty();
+    }
+
+    @Test
+    void sessaoRemovidaNaoApareceMaisNaLista() {
+        visitantes().salvar(SESSAO_A, carrinhoSo(ESFERA, "Esfera Chrome"));
+
+        visitantes().remover(SESSAO_A);
+
+        // Pode continuar na lista (índice sem expiração própria), mas nunca com carrinho para devolver.
+        assertThat(visitantes().sessoesComProduto(ESFERA)).allSatisfy(s -> assertThat(visitantes().buscar(s)).isEmpty());
     }
 
     @Test

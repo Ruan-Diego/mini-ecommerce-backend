@@ -5,6 +5,7 @@ import com.ruandiego.mini.carrinho.application.memoria.CarrinhoClienteRepository
 import com.ruandiego.mini.carrinho.application.memoria.CarrinhoVisitanteRepositoryEmMemoria;
 import com.ruandiego.mini.carrinho.application.memoria.CatalogoProdutosEmMemoria;
 import com.ruandiego.mini.carrinho.application.memoria.CupomRepositoryEmMemoria;
+import com.ruandiego.mini.carrinho.application.memoria.PrecosJaProcessadosEmMemoria;
 import com.ruandiego.mini.carrinho.application.service.CarrinhoService;
 import com.ruandiego.mini.carrinho.domain.model.ProdutoId;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -53,6 +54,11 @@ class CarrinhoEmMemoria {
     }
 
     @Bean
+    PrecosJaProcessadosEmMemoria processados() {
+        return new PrecosJaProcessadosEmMemoria();
+    }
+
+    @Bean
     CatalogoDeTeste catalogo() {
         return new CatalogoDeTeste();
     }
@@ -60,7 +66,8 @@ class CarrinhoEmMemoria {
     @Bean
     CarrinhoService carrinhoService(CarrinhoVisitanteRepositoryEmMemoria visitantes,
                                     CarrinhoClienteRepositoryEmMemoria clientes, CupomRepositoryEmMemoria cupons,
-                                    CatalogoDeTeste catalogo) {
-        return new CarrinhoService(visitantes, clientes, cupons, catalogo, Clock.fixed(AGORA, ZoneOffset.UTC));
+                                    CatalogoDeTeste catalogo, PrecosJaProcessadosEmMemoria processados) {
+        return new CarrinhoService(visitantes, clientes, cupons, catalogo, processados,
+                Clock.fixed(AGORA, ZoneOffset.UTC));
     }
 }

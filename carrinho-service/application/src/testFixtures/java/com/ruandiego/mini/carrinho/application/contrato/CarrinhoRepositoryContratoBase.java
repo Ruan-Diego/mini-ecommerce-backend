@@ -20,19 +20,32 @@ final class CarrinhoRepositoryContratoBase {
     private CarrinhoRepositoryContratoBase() {
     }
 
-    /** Dois itens e um cupom percentual com mínimo: exercita todos os campos que o adapter precisa guardar. */
+    /**
+     * Dois itens (o cubo com aviso de mudança de preço, de 49,90 para 59,90) e um cupom percentual com
+     * mínimo: exercita todos os campos que o adapter precisa guardar.
+     */
     static Carrinho carrinhoCompleto() {
         Carrinho c = Carrinho.criar();
         c.adicionarItem(ESFERA, "Esfera Chrome", Dinheiro.de("100.00"), 2);
         c.adicionarItem(CUBO, "Cubo Preto", Dinheiro.de("49.90"), 1);
+        c.atualizarPreco(CUBO, Dinheiro.de("59.90"));
         c.aplicarCupom(Cupom.percentual("BEMVINDO", 10, VALIDADE, Dinheiro.de("100.00")),
                 Instant.parse("2026-11-19T12:00:00Z"));
+        return c;
+    }
+
+    /** Só o produto pedido, sem aviso: serve para conferir quem tem ou não o produto. */
+    static Carrinho carrinhoSo(ProdutoId produto, String nome) {
+        Carrinho c = Carrinho.criar();
+        c.adicionarItem(produto, nome, Dinheiro.de("10.00"), 1);
         return c;
     }
 
     static void assertIgual(Carrinho lido, Carrinho esperado) {
         assertThat(lido.id()).isEqualTo(esperado.id());
         assertThat(lido.itens()).containsExactlyElementsOf(esperado.itens());
+        assertThat(lido.itens()).extracting(i -> i.precoAnterior()).containsExactlyElementsOf(
+                esperado.itens().stream().map(i -> i.precoAnterior()).toList());
         assertThat(lido.subtotal()).isEqualTo(esperado.subtotal());
         assertThat(lido.cupom()).isEqualTo(esperado.cupom());
     }
