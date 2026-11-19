@@ -44,6 +44,16 @@ docker compose -f infra/docker-compose.yml up -d --wait   # espera todos os heal
 ./gradlew :gateway:bootRun
 ```
 
+O gateway também pode rodar em container, com healthcheck, apontando para os serviços no host:
+
+```bash
+./gradlew :gateway:bootJar
+docker compose -f infra/docker-compose.yml --profile apps up -d --build --wait gateway
+curl http://localhost:8080/api/catalogo/produtos   # o gateway tira o /api/catalogo e repassa para :8081
+```
+
+Swagger UI do catálogo: http://localhost:8081/swagger-ui/index.html
+
 | Serviço | Endereço | Acesso |
 | --- | --- | --- |
 | Gateway | http://localhost:8080 | — |
