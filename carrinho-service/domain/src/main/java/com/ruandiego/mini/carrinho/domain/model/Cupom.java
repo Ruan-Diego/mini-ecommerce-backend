@@ -26,6 +26,8 @@ public record Cupom(String codigo, Tipo tipo, BigDecimal valor, Instant validoAt
         Objects.requireNonNull(valor, "valor");
         Objects.requireNonNull(validoAte, "validoAte");
         valorMinimo = valorMinimo == null ? Dinheiro.ZERO : valorMinimo;
+        // Sempre 2 casas, como o Dinheiro: sem isto, 10 e 10.00 seriam cupons "diferentes" no equals do record.
+        valor = valor.setScale(2, RoundingMode.HALF_EVEN);
         if (valor.signum() <= 0) {
             throw new RegraDeNegocioException("valor do cupom deve ser maior que zero");
         }

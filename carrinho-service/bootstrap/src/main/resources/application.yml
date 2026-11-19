@@ -4,6 +4,28 @@ server:
 spring:
   application:
     name: carrinho-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/carrinho
+    username: ${DB_USER:carrinho}
+    password: ${DB_PASSWORD:carrinho}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+carrinho:
+  # Carrinho de visitante: some depois de 7 dias sem uso (cada gravação renova o prazo).
+  visitante:
+    ttl: 7d
+  # API do catalogo-service, de onde vêm nome e preço dos produtos.
+  catalogo:
+    url: ${CATALOGO_URL:http://localhost:8081}
 
 management:
   endpoints:

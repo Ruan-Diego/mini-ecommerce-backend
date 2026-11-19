@@ -5,6 +5,7 @@ import com.ruandiego.mini.catalogo.application.port.in.BuscarProdutosUseCase.Fil
 import com.ruandiego.mini.catalogo.application.port.in.BuscarProdutosUseCase.Ordem;
 import com.ruandiego.mini.catalogo.application.port.in.ListarCategoriasUseCase;
 import com.ruandiego.mini.catalogo.application.port.in.ObterProdutoUseCase;
+import com.ruandiego.mini.catalogo.domain.model.ProdutoId;
 import com.ruandiego.mini.catalogo.domain.model.Slug;
 import com.ruandiego.mini.kernel.Dinheiro;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,6 +63,13 @@ class VitrineController {
     @Operation(summary = "Detalhe de um produto ativo")
     ProdutoResposta obter(@PathVariable String slug) {
         return ProdutoResposta.de(obterProduto.obterPorSlug(new Slug(slug)));
+    }
+
+    @GetMapping("/produtos/por-id/{id}")
+    @Operation(summary = "Detalhe de um produto ativo pelo id (usado pelo carrinho)")
+    ProdutoResposta obterPorId(@PathVariable String id) {
+        return ProdutoResposta.de(obterProduto.obterPorId(
+                RequisicaoInvalidaException.converter("id", id, ProdutoId::de)));
     }
 
     @GetMapping("/categorias")
