@@ -6,6 +6,7 @@ import com.ruandiego.mini.pagamento.application.port.out.GatewayPagamento;
 import com.ruandiego.mini.pagamento.application.port.out.MensagensProcessadas;
 import com.ruandiego.mini.pagamento.application.port.out.Outbox;
 import com.ruandiego.mini.pagamento.application.port.out.PagamentoRepository;
+import com.ruandiego.mini.pagamento.application.port.out.PedidosCancelados;
 import com.ruandiego.mini.pagamento.application.port.out.PublicadorEventos;
 import com.ruandiego.mini.pagamento.application.service.PagamentoService;
 import com.ruandiego.mini.pagamento.application.service.PedidoEventosService;
@@ -42,17 +43,19 @@ class PagamentoConfig {
     /** Implementa Iniciar, Consultar, ProcessarEventoDoGateway, Estornar e ExpirarPixVencidos. */
     @Bean
     PagamentoService pagamentoService(PagamentoRepository pagamentos, GatewayPagamento gateway,
-                                      EventosDoGatewayProcessados processados, PublicadorEventos publicador,
+                                      EventosDoGatewayProcessados processados, PedidosCancelados cancelados,
+                                      PublicadorEventos publicador,
                                       Clock relogio, PlatformTransactionManager transacoes) {
-        return transacional(new PagamentoService(pagamentos, gateway, processados, publicador, relogio), transacoes);
+        return transacional(new PagamentoService(pagamentos, gateway, processados, cancelados, publicador, relogio), transacoes);
     }
 
     /** Implementa ProcessarEventoDePedido: o pagamento reagindo ao pedido cancelado (compensação da saga). */
     @Bean
     PedidoEventosService pedidoEventosService(PagamentoRepository pagamentos, GatewayPagamento gateway,
-                                              MensagensProcessadas processadas, PublicadorEventos publicador,
+                                              MensagensProcessadas processadas, PedidosCancelados cancelados,
+                                              PublicadorEventos publicador,
                                               Clock relogio, PlatformTransactionManager transacoes) {
-        return transacional(new PedidoEventosService(pagamentos, gateway, processadas, publicador, relogio), transacoes);
+        return transacional(new PedidoEventosService(pagamentos, gateway, processadas, cancelados, publicador, relogio), transacoes);
     }
 
     @Bean

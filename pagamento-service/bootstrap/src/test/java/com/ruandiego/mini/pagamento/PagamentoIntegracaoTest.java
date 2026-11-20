@@ -89,6 +89,7 @@ class PagamentoIntegracaoTest {
         jdbc.update("DELETE FROM outbox");
         jdbc.update("DELETE FROM evento_gateway_processado");
         jdbc.update("DELETE FROM mensagens_processadas");
+        jdbc.update("DELETE FROM pedido_cancelado");
         jdbc.update("DELETE FROM pagamento");
         rabbitAdmin.purgeQueue(FILA_DE_TESTE, false);
         rabbitAdmin.purgeQueue("pagamento.pedido", false);
@@ -300,6 +301,24 @@ class PagamentoIntegracaoTest {
         assertThat(eventosNaOutbox("pagamento.estornado")).isEqualTo(1);
         assertThat(contar("mensagens_processadas")).isEqualTo(2);
         assertThat(rabbit.receive("pagamento.pedido.dlq")).isNull();
+    }
+
+    @Test
+    void pedidoCanceladoNaoAceitaMaisPagamentoEUmCartaoRecusadoTambemFechaOPedido() throws Exception {
+        // Cancelado por outra causa (estoque, expiração...): o evento chega e o pagamento passa a dar 409.
+        enviarPedidoCancelado(UUID.randomUUID().toString());
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(contar("pedido_cancelado")).isEqualTo(1));
+        mvc.perform(como("ana", post("/pagamentos")).contentType(MediaType.APPLICATION_JSON).content(cartao(CARTAO_APROVADO)))
+                .andExpect(status().isConflict());
+        assertThat(contar("pagamento")).isZero();
+
+        // Pedido que teve cartão recusado: nova tentativa é 409, sem esperar o evento (e sem chamar a operadora).
+        jdbc.update("DELETE FROM pedido_cancelado");
+        iniciar(cartao("4111111111111113"));
+        mvc.perform(como("ana", post("/pagamentos")).contentType(MediaType.APPLICATION_JSON).content(cartao(CARTAO_APROVADO)))
+                .andExpect(status().isConflict());
+        assertThat(contar("pagamento")).isEqualTo(1);
     }
 
     @Test
