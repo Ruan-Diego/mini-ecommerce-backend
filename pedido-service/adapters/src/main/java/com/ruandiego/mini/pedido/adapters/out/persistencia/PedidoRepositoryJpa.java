@@ -4,8 +4,11 @@ import com.ruandiego.mini.pedido.application.port.out.PedidoRepository;
 import com.ruandiego.mini.pedido.domain.model.ClienteId;
 import com.ruandiego.mini.pedido.domain.model.Pedido;
 import com.ruandiego.mini.pedido.domain.model.PedidoId;
+import com.ruandiego.mini.pedido.domain.model.StatusPedido;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,5 +38,11 @@ public class PedidoRepositoryJpa implements PedidoRepository {
     @Override
     public List<Pedido> listarPorCliente(ClienteId cliente) {
         return jpa.findByClienteIdOrderByCriadoEmDesc(cliente.valor()).stream().map(PedidoMapper::paraDominio).toList();
+    }
+
+    @Override
+    public List<Pedido> listarAguardandoPagamentoCriadosAte(Instant criadosAte, int quantidade) {
+        return jpa.findByStatusAndCriadoEmLessThanEqualOrderByCriadoEmAsc(StatusPedido.AGUARDANDO_PAGAMENTO, criadosAte,
+                PageRequest.of(0, quantidade)).stream().map(PedidoMapper::paraDominio).toList();
     }
 }

@@ -4,7 +4,9 @@ import com.ruandiego.mini.pedido.application.port.out.PedidoRepository;
 import com.ruandiego.mini.pedido.domain.model.ClienteId;
 import com.ruandiego.mini.pedido.domain.model.Pedido;
 import com.ruandiego.mini.pedido.domain.model.PedidoId;
+import com.ruandiego.mini.pedido.domain.model.StatusPedido;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +36,17 @@ public class PedidoRepositoryEmMemoria implements PedidoRepository {
         return dados.values().stream()
                 .filter(pedido -> pedido.clienteId().equals(cliente))
                 .sorted(Comparator.comparing(Pedido::criadoEm).reversed())
+                .map(PedidoRepositoryEmMemoria::copia)
+                .toList();
+    }
+
+    @Override
+    public List<Pedido> listarAguardandoPagamentoCriadosAte(Instant criadosAte, int quantidade) {
+        return dados.values().stream()
+                .filter(pedido -> pedido.status() == StatusPedido.AGUARDANDO_PAGAMENTO)
+                .filter(pedido -> !pedido.criadoEm().isAfter(criadosAte))
+                .sorted(Comparator.comparing(Pedido::criadoEm))
+                .limit(quantidade)
                 .map(PedidoRepositoryEmMemoria::copia)
                 .toList();
     }

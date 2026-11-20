@@ -83,4 +83,41 @@ public abstract class PedidoRepositoryContrato {
                 .extracting(Pedido::id).containsExactly(recente.id(), antigo.id());
         assertThat(pedidos().listarPorCliente(new ClienteId("ninguem"))).isEmpty();
     }
+
+    @Test
+    void listaOsAguardandoPagamentoCriadosAteOLimiteInclusivoDoMaisAntigoParaOMaisNovo() {
+        Pedido maisAntigo = pedido("cliente-1", T0);
+        Pedido noLimite = pedido("cliente-2", T0.plusSeconds(1800));
+        Pedido depoisDoLimite = pedido("cliente-1", T0.plusSeconds(1801));
+        pedidos().salvar(noLimite);
+        pedidos().salvar(depoisDoLimite);
+        pedidos().salvar(maisAntigo);
+
+        assertThat(pedidos().listarAguardandoPagamentoCriadosAte(T0.plusSeconds(1800), 10))
+                .extracting(Pedido::id).containsExactly(maisAntigo.id(), noLimite.id());
+    }
+
+    @Test
+    void naoListaOsQueJaSairamDeAguardandoPagamento() {
+        Pedido cancelado = pedido("cliente-1", T0);
+        Pedido pago = pedido("cliente-1", T0);
+        Pedido aguardando = pedido("cliente-1", T0);
+        cancelado.cancelar(T0.plusSeconds(10));
+        pago.marcarComoPago(T0.plusSeconds(10));
+        pedidos().salvar(cancelado);
+        pedidos().salvar(pago);
+        pedidos().salvar(aguardando);
+
+        assertThat(pedidos().listarAguardandoPagamentoCriadosAte(T0.plusSeconds(3600), 10))
+                .extracting(Pedido::id).containsExactly(aguardando.id());
+    }
+
+    @Test
+    void respeitaOLimiteDeQuantidade() {
+        for (int i = 0; i < 5; i++) {
+            pedidos().salvar(pedido("cliente-1", T0.plusSeconds(i)));
+        }
+
+        assertThat(pedidos().listarAguardandoPagamentoCriadosAte(T0.plusSeconds(3600), 3)).hasSize(3);
+    }
 }
