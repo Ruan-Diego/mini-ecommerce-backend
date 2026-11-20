@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Emissor esperado no claim iss (o que o navegador enxerga) e onde buscar as chaves públicas.
+          # Separados porque, no container, o Keycloak não é "localhost". Nada é buscado na subida.
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/mini}
+          jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:8180/realms/mini/protocol/openid-connect/certs}
   cloud:
     gateway:
       server:

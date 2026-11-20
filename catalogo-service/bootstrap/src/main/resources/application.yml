@@ -8,6 +8,12 @@ spring:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/catalogo
     username: ${DB_USER:catalogo}
     password: ${DB_PASSWORD:catalogo}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/mini}
+          jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:8180/realms/mini/protocol/openid-connect/certs}
   jpa:
     open-in-view: false
     hibernate:
