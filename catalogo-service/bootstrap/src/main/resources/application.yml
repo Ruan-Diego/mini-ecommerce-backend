@@ -18,8 +18,21 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # O relay só dá baixa na outbox depois que o broker confirma o recebimento.
+    publisher-confirm-type: correlated
   flyway:
     enabled: true
+
+catalogo:
+  outbox:
+    # Intervalo entre rodadas do relay, em milissegundos.
+    intervalo: 1000
+    relay-ligado: true
 
 logging:
   pattern:

@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Sobe o catalogo-service inteiro (com o application.yml real) contra um MySQL 8 em container:
  * o Flyway cria o schema, o Hibernate valida as entidades e os use cases chegam pelos ports de entrada.
  */
-@SpringBootTest
+@SpringBootTest(properties = "catalogo.outbox.relay-ligado=false")
 @AutoConfigureMockMvc
 class CatalogoIntegracaoTest {
 
@@ -105,14 +105,93 @@ class CatalogoIntegracaoTest {
         }
 
         @Bean
+        @ServiceConnection
+        org.testcontainers.containers.RabbitMQContainer rabbitmq() {
+            return new org.testcontainers.containers.RabbitMQContainer("rabbitmq:4-management");
+        }
+
+        /** Fila de teste ligada aos eventos do catálogo, para o teste ver o que o relay publicou. */
+        @Bean
+        org.springframework.amqp.core.Queue filaDeTeste() {
+            // Durável: o RabbitMQ 4 recusa filas transitórias não exclusivas.
+            return new org.springframework.amqp.core.Queue(FILA_DE_TESTE, true);
+        }
+
+        @Bean
+        org.springframework.amqp.core.Binding ligacaoDaFilaDeTeste() {
+            return new org.springframework.amqp.core.Binding(FILA_DE_TESTE,
+                    org.springframework.amqp.core.Binding.DestinationType.QUEUE, "mini.events", "catalogo.#", null);
+        }
+
+        /**
+         * Decora a outbox real: depois de gravar o evento (ainda dentro da transação do use case) pode falhar.
+         * Assim o teste prova que a transação desfaz o produto E o evento já gravado na outbox.
+         */
+        @Bean
         @Primary
-        PublicadorEventos publicadorQuePodeFalhar() {
+        PublicadorEventos publicadorQuePodeFalhar(
+                com.ruandiego.mini.catalogo.adapters.out.persistencia.OutboxJpaAdapter real) {
             return eventos -> {
+                real.publicar(eventos);
                 if (PUBLICADOR_FALHA.get()) {
                     throw new IllegalStateException("falha simulada ao publicar");
                 }
             };
         }
+    }
+
+    private static final String FILA_DE_TESTE = "teste.catalogo-eventos";
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Autowired
+    private org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
+
+    @Autowired
+    private org.springframework.amqp.rabbit.core.RabbitAdmin rabbitAdmin;
+
+    @Autowired
+    private com.ruandiego.mini.catalogo.application.service.RelayDoOutbox relay;
+
+    /**
+     * Fecha o ponta a ponta de PrecoAlterado que o roadmap deixava pendente: mudar o preço grava o evento na
+     * outbox (JSON plano, o contrato do carrinho), e só quando o relay roda ele chega ao RabbitMQ, com
+     * messageId e trace id.
+     */
+    @Test
+    void mudarOPrecoGravaNaOutboxESoSaiParaORabbitMqQuandoORelayRoda() throws Exception {
+        jdbc.update("DELETE FROM outbox");
+        rabbitAdmin.purgeQueue(FILA_DE_TESTE, false);
+        Categoria brincos = Categoria.criar("Brincos", null, null);
+        categorias.salvar(brincos);
+        ProdutoId id = cadastrar.cadastrar(new CadastrarProdutoUseCase.Comando(new Sku("BRC-LUA"), "Brinco Lua",
+                null, "", Dinheiro.de("100.00"), List.of(), brincos.id()));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox", Integer.class)).isZero(); // cadastrar não muda preço
+
+        org.slf4j.MDC.put("traceId", "trace-do-teste");
+        try {
+            atualizar.atualizar(new AtualizarProdutoUseCase.Comando(id, "Brinco Lua", "", Dinheiro.de("80.00"),
+                    List.of(), brincos.id()));
+        } finally {
+            org.slf4j.MDC.remove("traceId");
+        }
+
+        assertThat(jdbc.queryForObject("SELECT tipo FROM outbox", String.class)).isEqualTo("catalogo.preco-alterado");
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM outbox", String.class)).isEqualTo("trace-do-teste");
+        assertThat(rabbit.receive(FILA_DE_TESTE)).isNull(); // o relay está desligado: o broker não recebeu nada
+
+        assertThat(relay.publicarPendentes(10)).isEqualTo(1);
+
+        org.springframework.amqp.core.Message mensagem = rabbit.receive(FILA_DE_TESTE, 5_000);
+        assertThat(mensagem).isNotNull();
+        assertThat(mensagem.getMessageProperties().getReceivedRoutingKey()).isEqualTo("catalogo.preco-alterado");
+        assertThat(mensagem.getMessageProperties().getMessageId())
+                .isEqualTo(jdbc.queryForObject("SELECT id FROM outbox", String.class));
+        assertThat(mensagem.getMessageProperties().getHeader("x-trace-id").toString()).isEqualTo("trace-do-teste");
+        String corpo = new String(mensagem.getBody(), java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(corpo).contains("\"produtoId\":\"" + id + "\"").contains("\"sku\":\"BRC-LUA\"")
+                .contains("\"precoAnterior\":100.00").contains("\"precoNovo\":80.00").contains("\"ocorridoEm\":\"");
     }
 
     @Autowired
@@ -160,5 +239,7 @@ class CatalogoIntegracaoTest {
         }
 
         assertThat(obter.obterPorSlug(new Slug("anel-iris")).preco()).isEqualTo(Dinheiro.de("219.00"));
+        // O evento já gravado na outbox (antes da falha) também foi desfeito: sem produto alterado, sem evento.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox WHERE payload LIKE '%ANL-IRIS%'", Integer.class)).isZero();
     }
 }
