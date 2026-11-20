@@ -15,6 +15,7 @@ rootProject.name = "mini-ecommerce-backend"
 
 include("shared-kernel")
 include("gateway")
+include("saga-tests") // testes de integração que sobem pedido, estoque e pagamento juntos
 
 // Cada serviço tem um módulo Gradle por camada da arquitetura hexagonal.
 val servicos = listOf("catalogo", "carrinho", "pedido", "pagamento", "estoque")
