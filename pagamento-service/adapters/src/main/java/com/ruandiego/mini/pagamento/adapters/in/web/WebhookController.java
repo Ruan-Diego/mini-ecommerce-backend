@@ -4,6 +4,7 @@ import com.ruandiego.mini.pagamento.application.port.in.ProcessarEventoDoGateway
 import com.ruandiego.mini.pagamento.application.port.in.ProcessarEventoDoGatewayUseCase.Resultado;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -22,6 +23,7 @@ import java.util.Map;
  * (`resultado` diz qual foi o caso). Responder 200 no reenvio é o que faz o gateway parar de reenviar.
  */
 @RestController
+@ConditionalOnProperty(name = "pagamento.gateway", havingValue = "fake", matchIfMissing = true)
 class WebhookController {
 
     static final String CABECALHO_SEGREDO = "X-Webhook-Segredo";
