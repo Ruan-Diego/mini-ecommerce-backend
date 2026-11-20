@@ -4,6 +4,43 @@ server:
 spring:
   application:
     name: pagamento-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/pagamento
+    username: ${DB_USER:pagamento}
+    password: ${DB_PASSWORD:pagamento}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # O relay só dá baixa na outbox depois que o broker confirma o recebimento.
+    publisher-confirm-type: correlated
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/mini}
+          jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:8180/realms/mini/protocol/openid-connect/certs}
+
+pagamento:
+  webhook:
+    # Segredo compartilhado com o gateway de pagamento (cabeçalho X-Webhook-Segredo). O valor padrão é só
+    # para desenvolvimento local: em qualquer outro ambiente, defina WEBHOOK_SEGREDO.
+    segredo: ${WEBHOOK_SEGREDO:dev-segredo-do-webhook}
+  outbox:
+    # Intervalo entre rodadas do relay, em milissegundos.
+    intervalo: 1000
+    relay-ligado: true
+  pix:
+    # Intervalo entre rodadas que expiram os Pix com mais de 30 minutos, em milissegundos.
+    intervalo-de-expiracao: 60000
+    expiracao-ligada: true
 
 management:
   endpoints:

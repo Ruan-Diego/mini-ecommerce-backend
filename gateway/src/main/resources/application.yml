@@ -43,6 +43,14 @@ spring:
               filters:
                 - StripPrefix=2
 
+            # Pagamentos (cliente logado), estorno (admin) e webhook do gateway (segredo, sem JWT).
+            - id: pagamento
+              uri: ${PAGAMENTO_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/pagamentos/**
+              filters:
+                - StripPrefix=2
+
             # Pedidos e cotação de frete: exige token (SegurancaConfig). /api/pedidos/pedidos/meus → /pedidos/meus.
             - id: pedido
               uri: ${PEDIDO_URL:http://localhost:8083}
