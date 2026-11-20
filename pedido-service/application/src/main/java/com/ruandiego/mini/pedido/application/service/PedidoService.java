@@ -7,6 +7,7 @@ import com.ruandiego.mini.pedido.application.port.in.CancelarPedidoUseCase;
 import com.ruandiego.mini.pedido.application.port.in.ConsultarPedidosUseCase;
 import com.ruandiego.mini.pedido.application.port.in.CotarFreteUseCase;
 import com.ruandiego.mini.pedido.application.port.in.CriarPedidoUseCase;
+import com.ruandiego.mini.pedido.application.port.in.ExpirarPedidosSemPagamentoUseCase;
 import com.ruandiego.mini.pedido.application.port.out.CalculadoraFrete;
 import com.ruandiego.mini.pedido.application.port.out.CatalogoConsulta;
 import com.ruandiego.mini.pedido.application.port.out.PedidoRepository;
@@ -20,6 +21,8 @@ import com.ruandiego.mini.pedido.domain.model.PedidoId;
 import com.ruandiego.mini.pedido.domain.model.ProdutoId;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,7 +34,12 @@ import java.util.Map;
  * juntos, ou nenhum dos dois.
  */
 public class PedidoService implements CriarPedidoUseCase, ConsultarPedidosUseCase, CancelarPedidoUseCase,
-        CotarFreteUseCase {
+        CotarFreteUseCase, ExpirarPedidosSemPagamentoUseCase {
+
+    /** Quanto tempo um pedido espera o pagamento antes de ser cancelado (a mesma validade da reserva do estoque). */
+    public static final Duration PRAZO_DE_PAGAMENTO = Duration.ofMinutes(30);
+
+    private static final int LOTE_DE_EXPIRACAO = 100;
 
     private final PedidoRepository pedidos;
     private final CalculadoraFrete calculadoraFrete;
@@ -113,6 +121,25 @@ public class PedidoService implements CriarPedidoUseCase, ConsultarPedidosUseCas
             itens.add(new ItemPedido(produto.id(), produto.nome(), produto.preco(), item.quantidade()));
         }
         return itens;
+    }
+
+    /**
+     * Cancela, em uma transação só, até {@value #LOTE_DE_EXPIRACAO} pedidos que passaram de 30 minutos sem
+     * pagamento. O relógio é o injetado, então o teste controla o "agora". Se o pagamento aprovado chegar
+     * entre a leitura e a gravação, a versão do pedido muda (controle otimista no adapter), a gravação falha, a
+     * transação desfaz tudo e a próxima rodada reavalia o que sobrou: nunca se cancela um pedido recém-pago.
+     */
+    @Override
+    public int expirarVencidos() {
+        Instant agora = relogio.instant();
+        List<Pedido> vencidos = pedidos.listarAguardandoPagamentoCriadosAte(agora.minus(PRAZO_DE_PAGAMENTO),
+                LOTE_DE_EXPIRACAO);
+        for (Pedido pedido : vencidos) {
+            pedido.cancelar(agora);
+            pedidos.salvar(pedido);
+            registrarEventos(pedido);
+        }
+        return vencidos.size();
     }
 
     private Frete escolherFrete(String cep, Dinheiro subtotal, String codigo) {

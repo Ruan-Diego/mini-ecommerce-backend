@@ -4,6 +4,7 @@ import com.ruandiego.mini.pagamento.application.memoria.EventosDoGatewayProcessa
 import com.ruandiego.mini.pagamento.application.memoria.GatewayPagamentoEmMemoria;
 import com.ruandiego.mini.pagamento.application.memoria.OutboxEmMemoria;
 import com.ruandiego.mini.pagamento.application.memoria.PagamentoRepositoryEmMemoria;
+import com.ruandiego.mini.pagamento.application.memoria.PedidosCanceladosEmMemoria;
 import com.ruandiego.mini.pagamento.application.service.PagamentoService;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -37,13 +38,19 @@ class PagamentoEmMemoria {
     }
 
     @Bean
+    PedidosCanceladosEmMemoria cancelados() {
+        return new PedidosCanceladosEmMemoria();
+    }
+
+    @Bean
     OutboxEmMemoria outbox() {
         return new OutboxEmMemoria();
     }
 
     @Bean
     PagamentoService pagamentoService(PagamentoRepositoryEmMemoria pagamentos, GatewayPagamentoEmMemoria gateway,
-                                      EventosDoGatewayProcessadosEmMemoria processados, OutboxEmMemoria outbox) {
-        return new PagamentoService(pagamentos, gateway, processados, outbox, Clock.fixed(AGORA, ZoneOffset.UTC));
+                                      EventosDoGatewayProcessadosEmMemoria processados,
+                                      PedidosCanceladosEmMemoria cancelados, OutboxEmMemoria outbox) {
+        return new PagamentoService(pagamentos, gateway, processados, cancelados, outbox, Clock.fixed(AGORA, ZoneOffset.UTC));
     }
 }

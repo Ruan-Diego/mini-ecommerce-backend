@@ -88,8 +88,12 @@ class PagamentoIntegracaoTest {
     void limpar() {
         jdbc.update("DELETE FROM outbox");
         jdbc.update("DELETE FROM evento_gateway_processado");
+        jdbc.update("DELETE FROM mensagens_processadas");
+        jdbc.update("DELETE FROM pedido_cancelado");
         jdbc.update("DELETE FROM pagamento");
         rabbitAdmin.purgeQueue(FILA_DE_TESTE, false);
+        rabbitAdmin.purgeQueue("pagamento.pedido", false);
+        rabbitAdmin.purgeQueue("pagamento.pedido.dlq", false);
         publicador.falharDepoisDeGravar = false;
         publicador.espiarPorOutraConexao = false;
         publicador.publicadasPorOutraConexao = null;
@@ -268,6 +272,65 @@ class PagamentoIntegracaoTest {
         assertThat(jdbc.queryForObject("SELECT status FROM pagamento", String.class)).isEqualTo("EXPIRADO");
         assertThat(jdbc.queryForObject("SELECT motivo_recusa FROM pagamento", String.class)).isEqualTo("Pix expirado");
         assertThat(eventosNaOutbox("pagamento.recusado")).isEqualTo(1);
+    }
+
+    // ---- compensação da saga: pedido cancelado estorna o pagamento aprovado ----
+
+    private void enviarPedidoCancelado(String messageId) {
+        String corpo = "{\"pedidoId\":\"%s\",\"clienteId\":\"ana\",\"de\":\"PAGO\",\"para\":\"CANCELADO\",\"ocorridoEm\":\"2026-11-20T12:00:00Z\"}"
+                .formatted(pedidoId);
+        rabbit.send("mini.events", "pedido.cancelado", org.springframework.amqp.core.MessageBuilder
+                .withBody(corpo.getBytes(StandardCharsets.UTF_8))
+                .setContentType(org.springframework.amqp.core.MessageProperties.CONTENT_TYPE_JSON)
+                .setMessageId(messageId)
+                .build());
+    }
+
+    @Test
+    void pedidoCanceladoEstornaOPagamentoAprovadoEAMensagemRepetidaNaoEstornaDeNovo() throws Exception {
+        iniciar(cartao(CARTAO_APROVADO));
+        String mensagem = UUID.randomUUID().toString();
+
+        enviarPedidoCancelado(mensagem);
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(jdbc.queryForObject("SELECT status FROM pagamento", String.class)).isEqualTo("ESTORNADO"));
+        enviarPedidoCancelado(mensagem);
+        enviarPedidoCancelado(UUID.randomUUID().toString()); // outra mensagem, mesmo pedido
+        Thread.sleep(1_500);
+
+        assertThat(eventosNaOutbox("pagamento.estornado")).isEqualTo(1);
+        assertThat(contar("mensagens_processadas")).isEqualTo(2);
+        assertThat(rabbit.receive("pagamento.pedido.dlq")).isNull();
+    }
+
+    @Test
+    void pedidoCanceladoNaoAceitaMaisPagamentoEUmCartaoRecusadoTambemFechaOPedido() throws Exception {
+        // Cancelado por outra causa (estoque, expiração...): o evento chega e o pagamento passa a dar 409.
+        enviarPedidoCancelado(UUID.randomUUID().toString());
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(contar("pedido_cancelado")).isEqualTo(1));
+        mvc.perform(como("ana", post("/pagamentos")).contentType(MediaType.APPLICATION_JSON).content(cartao(CARTAO_APROVADO)))
+                .andExpect(status().isConflict());
+        assertThat(contar("pagamento")).isZero();
+
+        // Pedido que teve cartão recusado: nova tentativa é 409, sem esperar o evento (e sem chamar a operadora).
+        jdbc.update("DELETE FROM pedido_cancelado");
+        iniciar(cartao("4111111111111113"));
+        mvc.perform(como("ana", post("/pagamentos")).contentType(MediaType.APPLICATION_JSON).content(cartao(CARTAO_APROVADO)))
+                .andExpect(status().isConflict());
+        assertThat(contar("pagamento")).isEqualTo(1);
+    }
+
+    @Test
+    void pedidoCanceladoSemPagamentoAprovadoNaoMudaNada() throws Exception {
+        iniciar(cartao("4111111111111113")); // recusado
+
+        enviarPedidoCancelado(UUID.randomUUID().toString());
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(15)).untilAsserted(() ->
+                assertThat(contar("mensagens_processadas")).isEqualTo(1));
+
+        assertThat(jdbc.queryForObject("SELECT status FROM pagamento", String.class)).isEqualTo("RECUSADO");
+        assertThat(eventosNaOutbox("pagamento.estornado")).isZero();
     }
 
     @Test

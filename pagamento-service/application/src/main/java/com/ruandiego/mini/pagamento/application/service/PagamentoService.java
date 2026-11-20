@@ -10,6 +10,7 @@ import com.ruandiego.mini.pagamento.application.port.in.ProcessarEventoDoGateway
 import com.ruandiego.mini.pagamento.application.port.out.EventosDoGatewayProcessados;
 import com.ruandiego.mini.pagamento.application.port.out.GatewayPagamento;
 import com.ruandiego.mini.pagamento.application.port.out.PagamentoRepository;
+import com.ruandiego.mini.pagamento.application.port.out.PedidosCancelados;
 import com.ruandiego.mini.pagamento.application.port.out.PublicadorEventos;
 import com.ruandiego.mini.pagamento.domain.RegraDeNegocioException;
 import com.ruandiego.mini.pagamento.domain.model.ClienteId;
@@ -36,14 +37,17 @@ public class PagamentoService implements IniciarPagamentoUseCase, ConsultarPagam
     private final PagamentoRepository pagamentos;
     private final GatewayPagamento gateway;
     private final EventosDoGatewayProcessados processados;
+    private final PedidosCancelados cancelados;
     private final PublicadorEventos publicador;
     private final Clock relogio;
 
     public PagamentoService(PagamentoRepository pagamentos, GatewayPagamento gateway,
-                            EventosDoGatewayProcessados processados, PublicadorEventos publicador, Clock relogio) {
+                            EventosDoGatewayProcessados processados, PedidosCancelados cancelados,
+                            PublicadorEventos publicador, Clock relogio) {
         this.pagamentos = pagamentos;
         this.gateway = gateway;
         this.processados = processados;
+        this.cancelados = cancelados;
         this.publicador = publicador;
         this.relogio = relogio;
     }
@@ -52,7 +56,7 @@ public class PagamentoService implements IniciarPagamentoUseCase, ConsultarPagam
     public Pagamento iniciar(Comando comando) {
         Instant agora = relogio.instant();
         validarCartao(comando);
-        impedirPagamentoEmDobro(comando.pedido(), agora);
+        exigirPedidoAbertoParaPagamento(comando.pedido(), agora);
 
         Pagamento pagamento;
         if (comando.metodo() == MetodoPagamento.CARTAO) {
@@ -160,12 +164,24 @@ public class PagamentoService implements IniciarPagamentoUseCase, ConsultarPagam
     }
 
     /** Pedido com pagamento aprovado, ou com Pix ainda válido, não aceita outro pagamento. */
-    private void impedirPagamentoEmDobro(PedidoId pedido, Instant agora) {
-        boolean jaPago = pagamentos.listarPorPedido(pedido).stream().anyMatch(p ->
+    /**
+     * Um pedido só é pago uma vez, e só enquanto está aberto. O pedido-service cancela o pedido quando um pagamento
+     * é recusado (cartão recusado ou Pix expirado), então uma nova tentativa depois de uma recusa, expiração ou
+     * estorno seria cobrar um pedido cancelado: é recusada aqui, sem esperar o evento `pedido.cancelado` chegar.
+     * O cancelamento por outra causa (estoque, expiração de 30 minutos, cliente) chega por esse evento e fica em
+     * {@link PedidosCancelados}.
+     */
+    private void exigirPedidoAbertoParaPagamento(PedidoId pedido, Instant agora) {
+        List<Pagamento> anteriores = pagamentos.listarPorPedido(pedido);
+        boolean jaPago = anteriores.stream().anyMatch(p ->
                 p.status() == StatusPagamento.APROVADO
                         || (p.status() == StatusPagamento.PENDENTE && !p.pixVencido(agora)));
         if (jaPago) {
             throw new ConflitoException("o pedido " + pedido + " já tem um pagamento aprovado ou em andamento");
+        }
+        if (!anteriores.isEmpty() || cancelados.estaCancelado(pedido)) {
+            throw new ConflitoException("o pedido " + pedido + " foi cancelado (pagamento recusado, expirado ou "
+                    + "estornado, ou cancelamento do pedido): refaça a compra");
         }
     }
 

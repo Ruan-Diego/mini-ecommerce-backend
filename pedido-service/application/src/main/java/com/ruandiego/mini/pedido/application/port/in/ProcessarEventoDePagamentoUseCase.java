@@ -18,9 +18,19 @@ public interface ProcessarEventoDePagamentoUseCase {
     record PagamentoEstornado(UUID mensagemId, PedidoId pedido) {
     }
 
+    record PagamentoRecusado(UUID mensagemId, PedidoId pedido) {
+    }
+
     /** O pedido vai para PAGO, se o valor e o dono do pagamento conferirem com o pedido. */
     void aprovado(PagamentoAprovado evento);
 
     /** O pedido é cancelado, se o fluxo ainda permitir (antes de ser enviado). */
     void estornado(PagamentoEstornado evento);
+
+    /**
+     * Passo de compensação da saga: o pagamento foi recusado (cartão recusado ou Pix expirado), então o pedido que
+     * aguardava pagamento é cancelado e `pedido.cancelado` faz o estoque devolver a reserva. Um pedido que já saiu
+     * de AGUARDANDO_PAGAMENTO (já pago por outra tentativa, ou já cancelado) não muda.
+     */
+    void recusado(PagamentoRecusado evento);
 }

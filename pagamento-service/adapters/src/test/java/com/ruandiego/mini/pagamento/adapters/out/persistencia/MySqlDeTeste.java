@@ -24,6 +24,8 @@ class MySqlDeTeste {
     static void limpar(JdbcTemplate jdbc) {
         jdbc.update("DELETE FROM outbox");
         jdbc.update("DELETE FROM evento_gateway_processado");
+        jdbc.update("DELETE FROM mensagens_processadas");
+        jdbc.update("DELETE FROM pedido_cancelado");
         jdbc.update("DELETE FROM pagamento");
     }
 }

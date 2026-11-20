@@ -11,6 +11,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
+import jakarta.persistence.Version;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
@@ -75,6 +76,13 @@ class PedidoJpa {
 
     @Column(name = "atualizado_em", nullable = false, columnDefinition = "datetime(6)")
     private Instant atualizadoEm;
+
+    /**
+     * Controle de concorrência otimista: o Hibernate só grava se a linha ainda estiver na versão lida. Protege a
+     * corrida entre o job de expiração e o pagamento aprovado: quem chegar depois falha em vez de sobrescrever.
+     */
+    @Version
+    private Long versao;
 
     // EAGER porque o Pedido do domínio sempre vem com os itens.
     @ElementCollection(fetch = FetchType.EAGER)

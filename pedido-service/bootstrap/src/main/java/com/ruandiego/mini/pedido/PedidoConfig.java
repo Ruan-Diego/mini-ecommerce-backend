@@ -4,6 +4,7 @@ import com.ruandiego.mini.pedido.application.port.out.BrokerMensagens;
 import com.ruandiego.mini.pedido.application.port.out.CalculadoraFrete;
 import com.ruandiego.mini.pedido.application.port.out.CatalogoConsulta;
 import com.ruandiego.mini.pedido.application.port.out.MensagensProcessadas;
+import com.ruandiego.mini.pedido.application.service.EstoqueEventosService;
 import com.ruandiego.mini.pedido.application.service.PagamentoEventosService;
 import com.ruandiego.mini.pedido.application.port.out.Outbox;
 import com.ruandiego.mini.pedido.application.port.out.PedidoRepository;
@@ -51,6 +52,14 @@ class PedidoConfig {
                                                     PublicadorEventos publicador, Clock relogio,
                                                     PlatformTransactionManager transacoes) {
         return transacional(new PagamentoEventosService(pedidos, processadas, publicador, relogio), transacoes);
+    }
+
+    /** Implementa ProcessarEventoDeEstoque: o pedido reagindo ao estoque indisponível (compensação da saga). */
+    @Bean
+    EstoqueEventosService estoqueEventosService(PedidoRepository pedidos, MensagensProcessadas processadas,
+                                                PublicadorEventos publicador, Clock relogio,
+                                                PlatformTransactionManager transacoes) {
+        return transacional(new EstoqueEventosService(pedidos, processadas, publicador, relogio), transacoes);
     }
 
     @Bean
