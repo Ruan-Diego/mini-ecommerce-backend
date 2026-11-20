@@ -46,6 +46,8 @@ class ContratoPactTest {
 
     private static final SessaoId SESSAO = new SessaoId("sessao-pact");
     private static final ProdutoId PRODUTO = ProdutoId.de("11111111-1111-4111-8111-111111111111");
+    /** O `sub` do token de teste: é o cliente logado dos contratos. */
+    static final String CLIENTE = "cliente-pact";
 
     @LocalServerPort
     private int porta;
@@ -66,9 +68,18 @@ class ContratoPactTest {
         contexto.setTarget(new HttpTestTarget("localhost", porta));
     }
 
+    /**
+     * Consumidores que chamam pelo caminho do gateway (base /api + prefixo do serviço): o teste tira o prefixo,
+     * como o StripPrefix=2 do gateway. O mfe-carrinho usa o caminho do próprio serviço.
+     */
+    private static final java.util.Set<String> CONSUMIDORES_PELO_GATEWAY = java.util.Set.of("mfe-checkout", "mfe-conta", "mfe-admin");
+
     @TestTemplate
     @ExtendWith(PactVerificationInvocationContextProvider.class)
-    void cumpreOContrato(PactVerificationContext contexto) {
+    void cumpreOContrato(PactVerificationContext contexto, org.apache.hc.core5.http.HttpRequest requisicao) {
+        if (CONSUMIDORES_PELO_GATEWAY.contains(contexto.getConsumer().getName())) {
+            requisicao.setPath(requisicao.getPath().replaceFirst("^/carrinho(?=/)", ""));
+        }
         contexto.verifyInteraction();
     }
 
@@ -89,6 +100,12 @@ class ContratoPactTest {
     void duasUnidadesComCupom() {
         duasUnidades();
         aplicarCupom.aplicar(Identidade.visitante(SESSAO), "BEMVINDO");
+    }
+
+    @State("o cliente logado tem 2 unidades do produto 11111111-1111-4111-8111-111111111111 no carrinho")
+    void clienteComDuasUnidades() {
+        limpar();
+        adicionar.adicionar(Identidade.cliente(new com.ruandiego.mini.carrinho.domain.model.ClienteId(CLIENTE)), PRODUTO, 2);
     }
 
     /** Cada interação começa do zero; o produto do contrato (R$ 100,00) está sempre à venda no catálogo falso. */
@@ -122,6 +139,19 @@ class ContratoPactTest {
         @ServiceConnection
         RabbitMQContainer rabbitmq() {
             return new RabbitMQContainer("rabbitmq:4-management");
+        }
+
+        /**
+         * Aceita qualquer Bearer do contrato como o cliente `cliente-pact`. A validação real do JWT (assinatura,
+         * emissor) é do Keycloak e já tem teste próprio; aqui interessa só o formato da API.
+         */
+        @Bean
+        org.springframework.security.oauth2.jwt.JwtDecoder jwtDoContrato() {
+            return token -> org.springframework.security.oauth2.jwt.Jwt.withTokenValue(token)
+                    .header("alg", "none").subject(CLIENTE)
+                    .claim("realm_access", java.util.Map.of("roles", java.util.List.of("cliente")))
+                    .issuedAt(java.time.Instant.now()).expiresAt(java.time.Instant.now().plusSeconds(300))
+                    .build();
         }
 
         /** O catálogo é outro serviço: no teste de contrato do carrinho, ele vira o adapter em memória. */
