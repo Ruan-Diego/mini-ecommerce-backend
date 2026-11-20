@@ -65,4 +65,33 @@ public abstract class ItemEstoqueRepositoryContrato {
                 .containsExactlyInAnyOrder(a, b)
                 .isSorted();
     }
+
+    @Test
+    void listaOsAbaixoDoLimiteDoMenorSaldoParaOMaiorEConta() {
+        ProdutoId zero = produto();
+        ProdutoId quatro = produto();
+        ProdutoId cinco = produto();
+        ProdutoId vinte = produto();
+        itens().salvar(ItemEstoque.reconstituir(cinco, 5, 0));
+        itens().salvar(ItemEstoque.reconstituir(quatro, 4, 9));
+        itens().salvar(ItemEstoque.reconstituir(vinte, 20, 0));
+        itens().salvar(ItemEstoque.reconstituir(zero, 0, 1));
+
+        assertThat(itens().listarComDisponivelAbaixoDe(5)).extracting(ItemEstoque::produtoId)
+                .containsExactly(zero, quatro);
+        assertThat(itens().contarComDisponivelAbaixoDe(5)).isEqualTo(2);
+        assertThat(itens().listarComDisponivelAbaixoDe(null)).extracting(ItemEstoque::produtoId)
+                .containsExactly(zero, quatro, cinco, vinte);
+        assertThat(itens().listarComDisponivelAbaixoDe(null).get(1).reservado()).isEqualTo(9);
+    }
+
+    @Test
+    void empateNoSaldoSegueOIdDoProduto() {
+        ProdutoId a = new ProdutoId(UUID.fromString("00000000-0000-0000-0000-00000000000a"));
+        ProdutoId b = new ProdutoId(UUID.fromString("00000000-0000-0000-0000-00000000000b"));
+        itens().salvar(ItemEstoque.novo(b, 1));
+        itens().salvar(ItemEstoque.novo(a, 1));
+
+        assertThat(itens().listarComDisponivelAbaixoDe(null)).extracting(ItemEstoque::produtoId).containsExactly(a, b);
+    }
 }

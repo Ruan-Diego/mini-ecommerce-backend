@@ -11,6 +11,9 @@ import java.util.Objects;
  */
 public class ItemEstoque {
 
+    /** Abaixo disso o produto aparece no painel do admin como estoque baixo. */
+    public static final int LIMITE_ESTOQUE_BAIXO = 5;
+
     private final ProdutoId produtoId;
     private int disponivel;
     private int reservado;
@@ -30,6 +33,11 @@ public class ItemEstoque {
 
     public static ItemEstoque reconstituir(ProdutoId produtoId, int disponivel, int reservado) {
         return new ItemEstoque(produtoId, disponivel, reservado);
+    }
+
+    /** Estoque baixo olha só o que ainda pode ser vendido; o reservado já tem dono. */
+    public boolean estoqueBaixo() {
+        return disponivel < LIMITE_ESTOQUE_BAIXO;
     }
 
     public boolean podeReservar(int quantidade) {

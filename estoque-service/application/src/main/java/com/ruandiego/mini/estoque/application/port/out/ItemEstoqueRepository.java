@@ -21,4 +21,12 @@ public interface ItemEstoqueRepository {
     List<ItemEstoque> buscarComTrava(Collection<ProdutoId> produtos);
 
     void salvar(ItemEstoque item);
+
+    /**
+     * Itens com `disponivel` estritamente abaixo de `limite` (nulo = todos), do menor saldo para o maior e,
+     * no empate, pelo id do produto.
+     */
+    List<ItemEstoque> listarComDisponivelAbaixoDe(Integer limite);
+
+    long contarComDisponivelAbaixoDe(int limite);
 }

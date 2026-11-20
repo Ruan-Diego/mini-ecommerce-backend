@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Controller sobre o service real e os adapters em memória: HTTP, validação e tradução de erros. */
-@WebMvcTest(controllers = EstoqueController.class)
+@WebMvcTest(controllers = {EstoqueController.class, AdminEstoqueController.class})
 @Import(EstoqueControllerTest.Cenario.class)
 class EstoqueControllerTest {
 
@@ -108,5 +108,45 @@ class EstoqueControllerTest {
                 .andExpect(status().isBadRequest());
         mvc.perform(put("/admin/estoque/" + produto).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ---- admin ----
+
+    @Test
+    void listaOEstoqueBaixoDoMenorSaldoParaOMaior() throws Exception {
+        String quatro = UUID.randomUUID().toString();
+        String zero = UUID.randomUUID().toString();
+        itens.salvar(ItemEstoque.reconstituir(ProdutoId.de(quatro), 4, 1));
+        itens.salvar(ItemEstoque.reconstituir(ProdutoId.de(zero), 0, 0));
+        itens.salvar(ItemEstoque.reconstituir(ProdutoId.de(produto), 30, 0));
+
+        mvc.perform(get("/admin/estoque").param("abaixoDe", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].produtoId").value(zero))
+                .andExpect(jsonPath("$[0].estoqueBaixo").value(true))
+                .andExpect(jsonPath("$[1].produtoId").value(quatro))
+                .andExpect(jsonPath("$[1].reservado").value(1));
+        mvc.perform(get("/admin/estoque"))
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[2].estoqueBaixo").value(false));
+    }
+
+    @Test
+    void filtroAbaixoDeInvalidoEhRecusado() throws Exception {
+        mvc.perform(get("/admin/estoque").param("abaixoDe", "0")).andExpect(status().isUnprocessableEntity());
+        mvc.perform(get("/admin/estoque").param("abaixoDe", "muito")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void indicadorContaOsItensAbaixoDeCinco() throws Exception {
+        itens.salvar(ItemEstoque.reconstituir(ProdutoId.de(UUID.randomUUID().toString()), 4, 0));
+        itens.salvar(ItemEstoque.reconstituir(ProdutoId.de(UUID.randomUUID().toString()), 5, 0));
+        itens.salvar(ItemEstoque.reconstituir(ProdutoId.de(produto), 0, 2));
+
+        mvc.perform(get("/admin/indicadores"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estoqueBaixo").value(2))
+                .andExpect(jsonPath("$.limite").value(5));
     }
 }
