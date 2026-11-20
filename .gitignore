@@ -8,3 +8,6 @@ out/
 .DS_Store
 .env
 *.log
+
+# Imagens enviadas pelo admin quando o catálogo roda local (catalogo.imagens.diretorio)
+dados/

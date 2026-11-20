@@ -5,6 +5,7 @@ import com.ruandiego.mini.pedido.application.ServicoIndisponivelException;
 import com.ruandiego.mini.pedido.application.memoria.CatalogoConsultaEmMemoria;
 import com.ruandiego.mini.pedido.application.memoria.OutboxEmMemoria;
 import com.ruandiego.mini.pedido.application.memoria.PedidoRepositoryEmMemoria;
+import com.ruandiego.mini.pedido.application.service.AdministracaoPedidosService;
 import com.ruandiego.mini.pedido.application.service.PedidoService;
 import com.ruandiego.mini.pedido.domain.model.ProdutoId;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Optional;
 
@@ -55,5 +57,11 @@ class PedidoEmMemoria {
     @Bean
     PedidoService pedidoService(PedidoRepositoryEmMemoria pedidos, CatalogoDeTeste catalogo, OutboxEmMemoria outbox) {
         return new PedidoService(pedidos, new FreteFixoAdapter(), catalogo, outbox, Clock.fixed(AGORA, ZoneOffset.UTC));
+    }
+
+    @Bean
+    AdministracaoPedidosService administracaoPedidosService(PedidoRepositoryEmMemoria pedidos, OutboxEmMemoria outbox) {
+        ZoneId brasilia = ZoneId.of("America/Sao_Paulo");
+        return new AdministracaoPedidosService(pedidos, outbox, Clock.fixed(AGORA, brasilia), brasilia);
     }
 }

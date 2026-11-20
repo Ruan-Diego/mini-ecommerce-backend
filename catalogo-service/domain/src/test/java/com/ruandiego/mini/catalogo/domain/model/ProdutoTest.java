@@ -188,4 +188,44 @@ class ProdutoTest {
         assertThat(produto.preco()).isEqualTo(Dinheiro.de("289.00"));
         assertThat(produto.eventosPendentes()).isEmpty();
     }
+
+    @Nested
+    class Imagens {
+
+        private Imagem foto(int n) {
+            return new Imagem("https://cdn.mini.dev/foto-" + n + ".webp", "Foto " + n);
+        }
+
+        @Test
+        void adicionaNoFimDaGaleriaAteCinco() {
+            Produto produto = Produto.criar(new Sku("ESF-01"), "Esfera", null, "", Dinheiro.de("10.00"),
+                    List.of(FOTO), ESFERAS);
+
+            for (int n = 2; n <= Produto.IMAGENS_MAXIMO; n++) {
+                produto.adicionarImagem(foto(n));
+            }
+
+            assertThat(produto.imagens()).hasSize(5).first().isEqualTo(FOTO);
+            assertThat(produto.imagens().get(4)).isEqualTo(foto(5));
+            assertThat(produto.aceitaMaisImagens()).isFalse();
+        }
+
+        @Test
+        void sextaImagemEhRecusadaENadaMuda() {
+            Produto produto = Produto.criar(new Sku("ESF-01"), "Esfera", null, "", Dinheiro.de("10.00"),
+                    List.of(foto(1), foto(2), foto(3), foto(4), foto(5)), ESFERAS);
+
+            assertThatThrownBy(() -> produto.adicionarImagem(foto(6)))
+                    .isInstanceOf(RegraDeNegocioException.class).hasMessageContaining("5");
+            assertThat(produto.imagens()).hasSize(5);
+        }
+
+        @Test
+        void cadastroComMaisDeCincoImagensEhRecusado() {
+            List<Imagem> seis = List.of(foto(1), foto(2), foto(3), foto(4), foto(5), foto(6));
+
+            assertThatThrownBy(() -> Produto.criar(new Sku("ESF-01"), "Esfera", null, "", Dinheiro.de("10.00"),
+                    seis, ESFERAS)).isInstanceOf(RegraDeNegocioException.class);
+        }
+    }
 }

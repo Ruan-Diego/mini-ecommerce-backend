@@ -16,6 +16,8 @@ import java.util.Objects;
  */
 public class Pedido extends AggregateRoot {
 
+    public static final int TAMANHO_MAXIMO_RASTREIO = 40;
+
     private final PedidoId id;
     private final ClienteId clienteId;
     private final List<ItemPedido> itens;
@@ -24,6 +26,7 @@ public class Pedido extends AggregateRoot {
     private final Instant criadoEm;
     private StatusPedido status;
     private Instant atualizadoEm;
+    private String codigoRastreio;
 
     private Pedido(PedidoId id, ClienteId clienteId, List<ItemPedido> itens, EnderecoEntrega endereco, Frete frete,
                    StatusPedido status, Instant criadoEm, Instant atualizadoEm) {
@@ -56,8 +59,17 @@ public class Pedido extends AggregateRoot {
     /** Recria um pedido já persistido. Não registra evento: nada de novo aconteceu. */
     public static Pedido reconstituir(PedidoId id, ClienteId clienteId, List<ItemPedido> itens,
                                       EnderecoEntrega endereco, Frete frete, StatusPedido status,
+                                      Instant criadoEm, Instant atualizadoEm, String codigoRastreio) {
+        Pedido pedido = new Pedido(id, clienteId, itens, endereco, frete, status, criadoEm, atualizadoEm);
+        pedido.codigoRastreio = codigoRastreio;
+        return pedido;
+    }
+
+    /** Atalho para pedido ainda não enviado (sem código de rastreio). */
+    public static Pedido reconstituir(PedidoId id, ClienteId clienteId, List<ItemPedido> itens,
+                                      EnderecoEntrega endereco, Frete frete, StatusPedido status,
                                       Instant criadoEm, Instant atualizadoEm) {
-        return new Pedido(id, clienteId, itens, endereco, frete, status, criadoEm, atualizadoEm);
+        return reconstituir(id, clienteId, itens, endereco, frete, status, criadoEm, atualizadoEm, null);
     }
 
     public void marcarComoPago(Instant agora) {
@@ -68,8 +80,18 @@ public class Pedido extends AggregateRoot {
         transicionar(StatusPedido.EM_SEPARACAO, agora);
     }
 
-    public void enviar(Instant agora) {
+    /** Todo pedido enviado tem código de rastreio: sem ele o cliente não acompanha a entrega. */
+    public void enviar(String codigoRastreio, Instant agora) {
+        String codigo = codigoRastreio == null ? "" : codigoRastreio.strip();
+        if (codigo.isEmpty()) {
+            throw new RegraDeNegocioException("o código de rastreio é obrigatório para enviar o pedido");
+        }
+        if (codigo.length() > TAMANHO_MAXIMO_RASTREIO) {
+            throw new RegraDeNegocioException(
+                    "o código de rastreio tem no máximo " + TAMANHO_MAXIMO_RASTREIO + " caracteres");
+        }
         transicionar(StatusPedido.ENVIADO, agora);
+        this.codigoRastreio = codigo;
     }
 
     public void entregar(Instant agora) {
@@ -128,5 +150,10 @@ public class Pedido extends AggregateRoot {
 
     public Instant atualizadoEm() {
         return atualizadoEm;
+    }
+
+    /** Preenchido no envio; nulo antes disso. */
+    public String codigoRastreio() {
+        return codigoRastreio;
     }
 }

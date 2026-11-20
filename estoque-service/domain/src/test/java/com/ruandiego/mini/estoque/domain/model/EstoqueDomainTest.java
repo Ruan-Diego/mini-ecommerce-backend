@@ -20,6 +20,14 @@ class EstoqueDomainTest {
     // --- ItemEstoque ---
 
     @Test
+    void estoqueBaixoEhDisponivelAbaixoDeCincoIgnorandoOReservado() {
+        assertThat(ItemEstoque.reconstituir(A, 4, 0).estoqueBaixo()).isTrue();
+        assertThat(ItemEstoque.reconstituir(A, 0, 0).estoqueBaixo()).isTrue();
+        assertThat(ItemEstoque.reconstituir(A, 5, 0).estoqueBaixo()).isFalse();
+        assertThat(ItemEstoque.reconstituir(A, 4, 50).estoqueBaixo()).isTrue();
+    }
+
+    @Test
     void reservarMoveDoDisponivelParaOReservado() {
         ItemEstoque item = ItemEstoque.novo(A, 10);
 

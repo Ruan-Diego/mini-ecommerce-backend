@@ -103,7 +103,7 @@ class PedidoTest {
     private static final Map<StatusPedido, BiConsumer<Pedido, Instant>> ACOES = Map.of(
             StatusPedido.PAGO, Pedido::marcarComoPago,
             StatusPedido.EM_SEPARACAO, Pedido::iniciarSeparacao,
-            StatusPedido.ENVIADO, Pedido::enviar,
+            StatusPedido.ENVIADO, (p, t) -> p.enviar("BR123456789", t),
             StatusPedido.ENTREGUE, Pedido::entregar,
             StatusPedido.CANCELADO, Pedido::cancelar);
 
@@ -195,11 +195,54 @@ class PedidoTest {
 
         pedido.marcarComoPago(T1);
         pedido.iniciarSeparacao(T1);
-        pedido.enviar(T1);
+        pedido.enviar("BR123456789", T1);
         pedido.entregar(T1);
 
         assertThat(pedido.status()).isEqualTo(StatusPedido.ENTREGUE);
         assertThat(pedido.eventosPendentes()).extracting(e -> e.tipo())
                 .containsExactly("pedido.pago", "pedido.em-separacao", "pedido.enviado", "pedido.entregue");
+    }
+
+    // ---- código de rastreio ----
+
+    @Test
+    void envioGuardaOCodigoDeRastreioSemEspacos() {
+        Pedido pedido = noStatus(StatusPedido.EM_SEPARACAO);
+        assertThat(pedido.codigoRastreio()).isNull();
+
+        pedido.enviar("  BR123456789  ", T1);
+
+        assertThat(pedido.codigoRastreio()).isEqualTo("BR123456789");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"   "})
+    void envioSemCodigoDeRastreioEhRecusado(String codigo) {
+        Pedido pedido = noStatus(StatusPedido.EM_SEPARACAO);
+
+        assertThatThrownBy(() -> pedido.enviar(codigo, T1))
+                .isInstanceOf(RegraDeNegocioException.class)
+                .hasMessageContaining("rastreio");
+        assertThat(pedido.status()).isEqualTo(StatusPedido.EM_SEPARACAO);
+        assertThat(pedido.eventosPendentes()).isEmpty();
+    }
+
+    @Test
+    void codigoDeRastreioTemTamanhoMaximo() {
+        Pedido pedido = noStatus(StatusPedido.EM_SEPARACAO);
+
+        assertThatThrownBy(() -> pedido.enviar("X".repeat(Pedido.TAMANHO_MAXIMO_RASTREIO + 1), T1))
+                .isInstanceOf(RegraDeNegocioException.class);
+        pedido.enviar("X".repeat(Pedido.TAMANHO_MAXIMO_RASTREIO), T1);
+        assertThat(pedido.status()).isEqualTo(StatusPedido.ENVIADO);
+    }
+
+    @Test
+    void envioForaDeOrdemNaoGravaOCodigo() {
+        Pedido pedido = noStatus(StatusPedido.PAGO);
+
+        assertThatThrownBy(() -> pedido.enviar("BR123456789", T1)).isInstanceOf(TransicaoDeStatusInvalida.class);
+        assertThat(pedido.codigoRastreio()).isNull();
     }
 }

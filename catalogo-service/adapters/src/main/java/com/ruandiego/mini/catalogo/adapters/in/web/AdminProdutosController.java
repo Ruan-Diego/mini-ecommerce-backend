@@ -1,5 +1,7 @@
 package com.ruandiego.mini.catalogo.adapters.in.web;
 
+import com.ruandiego.mini.catalogo.application.ArquivoImagem;
+import com.ruandiego.mini.catalogo.application.port.in.AdicionarImagemUseCase;
 import com.ruandiego.mini.catalogo.application.port.in.AtualizarProdutoUseCase;
 import com.ruandiego.mini.catalogo.application.port.in.CadastrarProdutoUseCase;
 import com.ruandiego.mini.catalogo.application.port.in.DesativarProdutoUseCase;
@@ -12,6 +14,8 @@ import com.ruandiego.mini.kernel.Dinheiro;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,9 +23,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 
@@ -37,12 +46,14 @@ class AdminProdutosController {
     private final CadastrarProdutoUseCase cadastrar;
     private final AtualizarProdutoUseCase atualizar;
     private final DesativarProdutoUseCase desativar;
+    private final AdicionarImagemUseCase imagens;
 
     AdminProdutosController(CadastrarProdutoUseCase cadastrar, AtualizarProdutoUseCase atualizar,
-                            DesativarProdutoUseCase desativar) {
+                            DesativarProdutoUseCase desativar, AdicionarImagemUseCase imagens) {
         this.cadastrar = cadastrar;
         this.atualizar = atualizar;
         this.desativar = desativar;
+        this.imagens = imagens;
     }
 
     @PostMapping
@@ -69,6 +80,25 @@ class AdminProdutosController {
     ResponseEntity<Void> desativar(@PathVariable String id) {
         desativar.desativar(produtoId(id));
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Upload de uma imagem (multipart: `arquivo` e `textoAlternativo`). Vai para o fim da galeria; o produto
+     * aceita até 5. Para reordenar ou remover, use o PUT com a lista de imagens.
+     */
+    @PostMapping(path = "/{id}/imagens", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Envia uma imagem do produto (JPEG, PNG ou WebP, até 2 MB; no máximo 5 por produto)")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
+    ImagemJson enviarImagem(@PathVariable String id, @RequestPart("arquivo") MultipartFile arquivo,
+                            @RequestParam("textoAlternativo") String textoAlternativo) {
+        byte[] conteudo;
+        try {
+            conteudo = arquivo.getBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        Imagem imagem = imagens.adicionarImagem(produtoId(id), ArquivoImagem.de(conteudo), textoAlternativo);
+        return ImagemJson.de(imagem);
     }
 
     private static List<Imagem> imagens(ProdutoRequisicao req) {

@@ -28,7 +28,18 @@ spring:
   flyway:
     enabled: true
 
+  servlet:
+    multipart:
+      # Upload de imagem: até 2 MB por arquivo (o ArquivoImagem confere de novo, com mensagem própria).
+      max-file-size: 2MB
+      max-request-size: 3MB
+
 catalogo:
+  imagens:
+    # Onde os arquivos enviados pelo admin ficam e por qual URL pública são servidos (GET /imagens/{arquivo}).
+    # A URL é a do gateway, que repassa /api/catalogo/** para este serviço.
+    diretorio: ${CATALOGO_IMAGENS_DIRETORIO:./dados/imagens}
+    url-publica: ${CATALOGO_IMAGENS_URL:http://localhost:8080/api/catalogo/imagens}
   outbox:
     # Intervalo entre rodadas do relay, em milissegundos.
     intervalo: 1000

@@ -199,7 +199,7 @@ class PagamentoEventosServiceTest {
         Pedido enviado = pedidos.buscarPorId(pedido.id()).orElseThrow();
         enviado.marcarComoPago(AGORA);
         enviado.iniciarSeparacao(AGORA);
-        enviado.enviar(AGORA);
+        enviado.enviar("BR123456789", AGORA);
         pedidos.salvar(enviado);
 
         assertThatThrownBy(() -> service.estornado(new PagamentoEstornado(UUID.randomUUID(), pedido.id())))

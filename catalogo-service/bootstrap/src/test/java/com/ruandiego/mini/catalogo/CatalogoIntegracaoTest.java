@@ -37,7 +37,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Sobe o catalogo-service inteiro (com o application.yml real) contra um MySQL 8 em container:
  * o Flyway cria o schema, o Hibernate valida as entidades e os use cases chegam pelos ports de entrada.
  */
-@SpringBootTest(properties = "catalogo.outbox.relay-ligado=false")
+@SpringBootTest(properties = {
+        "catalogo.outbox.relay-ligado=false",
+        "catalogo.imagens.diretorio=build/imagens-teste",
+        "catalogo.imagens.url-publica=http://localhost/imagens"})
 @AutoConfigureMockMvc
 class CatalogoIntegracaoTest {
 
@@ -72,6 +75,42 @@ class CatalogoIntegracaoTest {
                                 new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_cliente")))
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isForbidden());
+    }
+
+    /**
+     * Upload ponta a ponta: só o admin envia, o arquivo vai para o disco, a URL entra na galeria (MySQL) e o
+     * GET público em /imagens/{arquivo} devolve os mesmos bytes, com o Content-Type do tipo detectado.
+     */
+    @Test
+    void uploadDeImagemExigeAdminEOArquivoFicaPublico() throws Exception {
+        Categoria pecas = Categoria.criar("Peças com foto", null, null);
+        categorias.salvar(pecas);
+        ProdutoId id = cadastrar.cadastrar(new CadastrarProdutoUseCase.Comando(new Sku("PEC-FOTO"), "Peça com foto",
+                null, "", Dinheiro.de("10.00"), List.of(), pecas.id()));
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4};
+        var arquivo = new org.springframework.mock.web.MockMultipartFile("arquivo", "foto.png", "image/png", png);
+        String rota = "/admin/produtos/" + id + "/imagens";
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(rota).file(arquivo)
+                        .param("textoAlternativo", "Peça de frente"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(rota).file(arquivo)
+                        .param("textoAlternativo", "Peça de frente")
+                        .with(jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_cliente"))))
+                .andExpect(status().isForbidden());
+        String url = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(rota)
+                        .file(arquivo).param("textoAlternativo", "Peça de frente").with(admin()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString().replaceAll(".*\"url\":\"([^\"]+)\".*", "$1");
+
+        assertThat(url).matches("http://localhost/imagens/[0-9a-f-]{36}[.]png");
+        assertThat(obter.obterPorSlug(new Slug("peca-com-foto")).imagens()).extracting(i -> i.url()).containsExactly(url);
+        String arquivoPublico = url.substring("http://localhost".length());
+        mvc.perform(get(arquivoPublico))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType("image/png"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(png));
+        mvc.perform(get("/imagens/..%2Fbuild.gradle.kts")).andExpect(status().is4xxClientError());
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor admin() {

@@ -20,4 +20,10 @@ interface ItemEstoqueJpaRepository extends JpaRepository<ItemEstoqueJpa, String>
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from ItemEstoqueJpa i where i.produtoId in :ids order by i.produtoId")
     List<ItemEstoqueJpa> buscarComTrava(@Param("ids") Collection<String> ids);
+
+    List<ItemEstoqueJpa> findAllByOrderByDisponivelAscProdutoIdAsc();
+
+    List<ItemEstoqueJpa> findByDisponivelLessThanOrderByDisponivelAscProdutoIdAsc(int limite);
+
+    long countByDisponivelLessThan(int limite);
 }

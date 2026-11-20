@@ -296,6 +296,25 @@ class EstoqueIntegracaoTest {
         assertThat(saldo(produtoA)).containsEntry("disponivel", 30);
     }
 
+    /** As consultas do admin exigem o papel admin no próprio serviço, além do gateway. */
+    @Test
+    void consultasDoAdminExigemOPapelAdmin() throws Exception {
+        semear(produtoA, 3);
+
+        for (String rota : java.util.List.of("/admin/estoque?abaixoDe=5", "/admin/indicadores")) {
+            mvc.perform(get(rota)).andExpect(status().isUnauthorized());
+            mvc.perform(get(rota).with(jwt().jwt(t -> t.subject("ana")))).andExpect(status().isForbidden());
+        }
+        var admin = jwt().jwt(t -> t.subject("admin")).authorities(new SimpleGrantedAuthority("ROLE_admin"));
+        mvc.perform(get("/admin/estoque").param("abaixoDe", "5").with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].produtoId").value(produtoA.toString()))
+                .andExpect(jsonPath("$[0].estoqueBaixo").value(true));
+        mvc.perform(get("/admin/indicadores").with(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estoqueBaixo").value(1));
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     static class Infra {
 
