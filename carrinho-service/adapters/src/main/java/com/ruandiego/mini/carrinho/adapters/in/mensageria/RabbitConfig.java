@@ -26,6 +26,9 @@ class RabbitConfig {
     static final String FILA_PRECO_ALTERADO = "carrinho.preco-alterado";
     static final String EXCHANGE_MORTAS = "mini.events.dlx";
     static final String FILA_PRECO_ALTERADO_DLQ = "carrinho.preco-alterado.dlq";
+    static final String CHAVE_PEDIDO_CRIADO = "pedido.criado";
+    static final String FILA_PEDIDO_CRIADO = "carrinho.pedido-criado";
+    static final String FILA_PEDIDO_CRIADO_DLQ = "carrinho.pedido-criado.dlq";
 
     @Bean
     TopicExchange exchangeCatalogo() {
@@ -64,6 +67,31 @@ class RabbitConfig {
     @Bean
     Binding ligacaoDaFilaMorta(Queue filaPrecoAlteradoDlq, DirectExchange exchangeMortas) {
         return BindingBuilder.bind(filaPrecoAlteradoDlq).to(exchangeMortas).with(FILA_PRECO_ALTERADO);
+    }
+
+    /** Fila do evento do pedido-service, com a mesma política de fila morta da fila de preço. */
+    @Bean
+    Queue filaPedidoCriado() {
+        return QueueBuilder.durable(FILA_PEDIDO_CRIADO)
+                .deadLetterExchange(EXCHANGE_MORTAS)
+                .deadLetterRoutingKey(FILA_PEDIDO_CRIADO)
+                .build();
+    }
+
+    @Bean
+    Queue filaPedidoCriadoDlq() {
+        return QueueBuilder.durable(FILA_PEDIDO_CRIADO_DLQ).build();
+    }
+
+    /** A exchange `mini.events` é a mesma de todos os serviços: aqui só se liga a fila à chave `pedido.criado`. */
+    @Bean
+    Binding ligacaoPedidoCriado(Queue filaPedidoCriado, TopicExchange exchangeCatalogo) {
+        return BindingBuilder.bind(filaPedidoCriado).to(exchangeCatalogo).with(CHAVE_PEDIDO_CRIADO);
+    }
+
+    @Bean
+    Binding ligacaoDaFilaMortaPedidoCriado(Queue filaPedidoCriadoDlq, DirectExchange exchangeMortas) {
+        return BindingBuilder.bind(filaPedidoCriadoDlq).to(exchangeMortas).with(FILA_PEDIDO_CRIADO);
     }
 
     /** JSON em vez da serialização Java padrão. O tipo vem do parâmetro do listener, não de um cabeçalho do publicador. */

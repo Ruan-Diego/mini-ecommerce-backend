@@ -168,6 +168,35 @@ class CarrinhoIntegracaoTest {
         assertThat(morta.getMessageProperties().getHeaders()).containsKey("x-death");
     }
 
+    /**
+     * O pedido-service publica `pedido.criado` na exchange compartilhada; o carrinho do cliente esvazia. A
+     * mensagem usa o JSON real da outbox do pedido (com campos que o carrinho ignora). O carrinho de outro
+     * cliente e o de um visitante ficam intactos. Uma mensagem sem cliente vai para a DLQ sem travar a fila.
+     */
+    @Test
+    void pedidoCriadoPublicadoNoRabbitEsvaziaOCarrinhoDoClienteEVaiParaADlqSeMalformado() throws Exception {
+        String cliente = "cliente-" + UUID.randomUUID();
+        String outro = "cliente-" + UUID.randomUUID();
+        String sessao = "sessao-" + UUID.randomUUID();
+        adicionarComoCliente(cliente, PRODUTO_ID);
+        adicionarComoCliente(outro, PRODUTO_ID);
+        adicionar("X-Sessao-Id", sessao, PRODUTO_ID);
+
+        rabbit.send("mini.events", "pedido.criado", json("{\"pedidoId\":\"" + UUID.randomUUID() + "\",\"clienteId\":\""
+                + cliente + "\",\"total\":269.90,\"ocorridoEm\":\"2026-11-20T15:00:00Z\"}"));
+        rabbit.send("mini.events", "pedido.criado", json("{\"pedidoId\":\"p-lixo\",\"clienteId\":\"\"}"));
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
+                mvc.perform(get("/carrinhos/atual").with(jwtDe(cliente)))
+                        .andExpect(jsonPath("$.quantidadeTotal").value(0)));
+        mvc.perform(get("/carrinhos/atual").with(jwtDe(outro))).andExpect(jsonPath("$.quantidadeTotal").value(1));
+        mvc.perform(get("/carrinhos/atual").header("X-Sessao-Id", sessao)).andExpect(jsonPath("$.quantidadeTotal").value(1));
+
+        Message morta = rabbit.receive("carrinho.pedido-criado.dlq", 10_000);
+        assertThat(morta).isNotNull();
+        assertThat(new String(morta.getBody(), StandardCharsets.UTF_8)).contains("p-lixo");
+    }
+
     /** A trava desta mudança: "ser cliente" exige JWT válido; o header antigo não vale mais nada. */
     @Test
     void xClienteIdFalsificadoNaoDaAcessoAoCarrinhoDeNinguem() throws Exception {
