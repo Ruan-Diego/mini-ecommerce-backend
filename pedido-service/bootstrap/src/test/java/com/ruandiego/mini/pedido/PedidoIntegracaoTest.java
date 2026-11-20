@@ -113,6 +113,8 @@ class PedidoIntegracaoTest {
         rabbitAdmin.purgeQueue(FILA_DE_TESTE, false);
         rabbitAdmin.purgeQueue("pedido.pagamento", false);
         rabbitAdmin.purgeQueue("pedido.pagamento.dlq", false);
+        rabbitAdmin.purgeQueue("pedido.estoque", false);
+        rabbitAdmin.purgeQueue("pedido.estoque.dlq", false);
         jdbc.update("DELETE FROM mensagens_processadas");
         tentativas.zerar();
         publicador.falharDepoisDeGravar = false;
@@ -300,6 +302,47 @@ class PedidoIntegracaoTest {
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("CANCELADO"));
         assertThat(jdbc.queryForList("SELECT tipo FROM outbox ORDER BY seq", String.class))
                 .containsExactly("pedido.criado", "pedido.pago", "pedido.cancelado");
+    }
+
+    // ---- compensação da saga: estoque indisponível cancela o pedido ----
+
+    private void enviarEstoqueIndisponivel(String messageId) {
+        String corpo = "{\"pedidoId\":\"%s\",\"produtosSemEstoque\":[\"%s\"],\"ocorridoEm\":\"2026-11-20T12:00:00Z\"}"
+                .formatted(pedidoDoBanco(), UUID.randomUUID());
+        rabbit.send("mini.events", "estoque.indisponivel", MessageBuilder.withBody(corpo.getBytes(StandardCharsets.UTF_8))
+                .setContentType(MessageProperties.CONTENT_TYPE_JSON)
+                .setMessageId(messageId)
+                .build());
+    }
+
+    @Test
+    void estoqueIndisponivelCancelaOPedidoQueAguardaPagamentoEPublicaPedidoCancelado() throws Exception {
+        criar("ana");
+
+        enviarEstoqueIndisponivel(UUID.randomUUID().toString());
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("CANCELADO"));
+        assertThat(jdbc.queryForList("SELECT tipo FROM outbox ORDER BY seq", String.class))
+                .containsExactly("pedido.criado", "pedido.cancelado");
+    }
+
+    @Test
+    void estoqueIndisponivelCancelaTambemOPedidoQueJaFoiPagoEMensagemRepetidaNaoFazNada() throws Exception {
+        criar("ana");
+        // O cliente pagou antes de o estoque responder: o cancelamento é o que faz o pagamento estornar.
+        enviarEventoDePagamento("pagamento.aprovado", UUID.randomUUID().toString(), "ana", "219.90", null);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("PAGO"));
+        String mensagem = UUID.randomUUID().toString();
+
+        enviarEstoqueIndisponivel(mensagem);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("CANCELADO"));
+        enviarEstoqueIndisponivel(mensagem);
+        enviarEstoqueIndisponivel(mensagem);
+        Thread.sleep(1_500);
+
+        assertThat(jdbc.queryForList("SELECT tipo FROM outbox ORDER BY seq", String.class))
+                .containsExactly("pedido.criado", "pedido.pago", "pedido.cancelado");
+        assertThat(rabbit.receive("pedido.estoque.dlq")).isNull();
     }
 
     @Test
