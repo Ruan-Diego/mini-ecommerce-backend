@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -49,7 +50,7 @@ class CatalogoIntegracaoTest {
         Categoria pecas = Categoria.criar("Peças HTTP", null, null);
         categorias.salvar(pecas);
 
-        mvc.perform(post("/admin/produtos").contentType(MediaType.APPLICATION_JSON).content("""
+        mvc.perform(post("/admin/produtos").with(admin()).contentType(MediaType.APPLICATION_JSON).content("""
                         {"sku": "PEC-HTTP", "nome": "Peça HTTP", "preco": 12.50, "categoriaId": "%s"}"""
                         .formatted(pecas.id())))
                 .andExpect(status().isCreated());
@@ -58,6 +59,23 @@ class CatalogoIntegracaoTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.itens[0].slug").value("peca-http"))
                 .andExpect(jsonPath("$.itens[0].preco").value(12.50));
+    }
+
+    /** O serviço não confia só no gateway: /admin/** sem token é 401 e com token de cliente é 403. */
+    @Test
+    void adminExigeTokenComOPapelAdmin() throws Exception {
+        String corpo = "{\"sku\": \"PEC-SEG\", \"nome\": \"Peça\", \"preco\": 1.00}";
+
+        mvc.perform(post("/admin/produtos").contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/admin/produtos").with(jwt().authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_cliente")))
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isForbidden());
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor admin() {
+        return jwt().authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_admin"));
     }
 
     /** Critério de pronto da issue: todos os endpoints aparecem no OpenAPI (base do Swagger UI). */

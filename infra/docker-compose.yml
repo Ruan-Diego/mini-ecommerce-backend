@@ -69,6 +69,9 @@ services:
     environment:
       CATALOGO_URL: ${CATALOGO_URL:-http://host.docker.internal:8081}
       CARRINHO_URL: ${CARRINHO_URL:-http://host.docker.internal:8082}
+      # O token vem do navegador com iss = localhost:8180; as chaves, o container busca no serviço do Compose.
+      KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8180}/realms/mini
+      KEYCLOAK_JWKS: http://keycloak:8080/realms/mini/protocol/openid-connect/certs
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
