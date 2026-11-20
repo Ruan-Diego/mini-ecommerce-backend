@@ -7,6 +7,7 @@ import com.ruandiego.mini.pedido.application.memoria.OutboxEmMemoria;
 import com.ruandiego.mini.pedido.application.memoria.PedidoRepositoryEmMemoria;
 import com.ruandiego.mini.pedido.application.port.in.ProcessarEventoDePagamentoUseCase.PagamentoAprovado;
 import com.ruandiego.mini.pedido.application.port.in.ProcessarEventoDePagamentoUseCase.PagamentoEstornado;
+import com.ruandiego.mini.pedido.application.port.in.ProcessarEventoDePagamentoUseCase.PagamentoRecusado;
 import com.ruandiego.mini.pedido.domain.RegraDeNegocioException;
 import com.ruandiego.mini.pedido.domain.TransicaoDeStatusInvalida;
 import com.ruandiego.mini.pedido.domain.model.ClienteId;
@@ -121,6 +122,47 @@ class PagamentoEventosServiceTest {
     void pedidoInexistenteEhNaoEncontrado() {
         assertThatThrownBy(() -> service.aprovado(
                 new PagamentoAprovado(UUID.randomUUID(), PedidoId.novo(), ANA, Dinheiro.de("10.00"))))
+                .isInstanceOf(NaoEncontradoException.class);
+    }
+
+    // ---- pagamento recusado ----
+
+    @Test
+    void pagamentoRecusadoCancelaOPedidoQueAguardaPagamentoEGravaOEvento() {
+        Pedido pedido = pedidoAguardando();
+
+        service.recusado(new PagamentoRecusado(UUID.randomUUID(), pedido.id()));
+
+        assertThat(status(pedido)).isEqualTo(StatusPedido.CANCELADO);
+        assertThat(outbox.tiposGravados()).containsExactly("pedido.cancelado");
+    }
+
+    @Test
+    void recusaRepetidaOuDePedidoJaCanceladoNaoPublicaDeNovo() {
+        Pedido pedido = pedidoAguardando();
+        PagamentoRecusado mensagem = new PagamentoRecusado(UUID.randomUUID(), pedido.id());
+
+        service.recusado(mensagem);
+        service.recusado(mensagem); // mesma mensagem
+        service.recusado(new PagamentoRecusado(UUID.randomUUID(), pedido.id())); // outra recusa, pedido já cancelado
+
+        assertThat(outbox.tiposGravados()).containsExactly("pedido.cancelado");
+    }
+
+    @Test
+    void recusaAntigaNaoCancelaUmPedidoQueJaFoiPago() {
+        Pedido pedido = pedidoAguardando();
+        service.aprovado(aprovado(pedido, ANA, "219.90"));
+
+        service.recusado(new PagamentoRecusado(UUID.randomUUID(), pedido.id()));
+
+        assertThat(status(pedido)).isEqualTo(StatusPedido.PAGO);
+        assertThat(outbox.tiposGravados()).containsExactly("pedido.pago");
+    }
+
+    @Test
+    void recusaDePedidoInexistenteLanca() {
+        assertThatThrownBy(() -> service.recusado(new PagamentoRecusado(UUID.randomUUID(), PedidoId.novo())))
                 .isInstanceOf(NaoEncontradoException.class);
     }
 

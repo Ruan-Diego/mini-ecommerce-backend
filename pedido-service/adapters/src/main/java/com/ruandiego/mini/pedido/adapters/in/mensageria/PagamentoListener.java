@@ -4,6 +4,7 @@ import com.ruandiego.mini.kernel.Dinheiro;
 import com.ruandiego.mini.pedido.application.port.in.ProcessarEventoDePagamentoUseCase;
 import com.ruandiego.mini.pedido.application.port.in.ProcessarEventoDePagamentoUseCase.PagamentoAprovado;
 import com.ruandiego.mini.pedido.application.port.in.ProcessarEventoDePagamentoUseCase.PagamentoEstornado;
+import com.ruandiego.mini.pedido.application.port.in.ProcessarEventoDePagamentoUseCase.PagamentoRecusado;
 import com.ruandiego.mini.pedido.domain.model.ClienteId;
 import com.ruandiego.mini.pedido.domain.model.PedidoId;
 import org.slf4j.Logger;
@@ -52,6 +53,7 @@ class PagamentoListener {
                 case "pagamento.aprovado" -> processar.aprovado(new PagamentoAprovado(mensagemId, pedido,
                         new ClienteId(mensagem.clienteId()), new Dinheiro(mensagem.valor())));
                 case "pagamento.estornado" -> processar.estornado(new PagamentoEstornado(mensagemId, pedido));
+                case "pagamento.recusado" -> processar.recusado(new PagamentoRecusado(mensagemId, pedido));
                 default -> throw new IllegalArgumentException("evento de pagamento desconhecido: " + chave);
             }
         } finally {

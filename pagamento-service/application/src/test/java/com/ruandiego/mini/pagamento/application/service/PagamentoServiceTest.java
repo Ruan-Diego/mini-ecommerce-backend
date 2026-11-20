@@ -8,6 +8,7 @@ import com.ruandiego.mini.pagamento.application.memoria.EventosDoGatewayProcessa
 import com.ruandiego.mini.pagamento.application.memoria.GatewayPagamentoEmMemoria;
 import com.ruandiego.mini.pagamento.application.memoria.OutboxEmMemoria;
 import com.ruandiego.mini.pagamento.application.memoria.PagamentoRepositoryEmMemoria;
+import com.ruandiego.mini.pagamento.application.memoria.PedidosCanceladosEmMemoria;
 import com.ruandiego.mini.pagamento.application.port.in.IniciarPagamentoUseCase.Comando;
 import com.ruandiego.mini.pagamento.application.port.in.ProcessarEventoDoGatewayUseCase.Evento;
 import com.ruandiego.mini.pagamento.application.port.in.ProcessarEventoDoGatewayUseCase.Resultado;
@@ -66,8 +67,9 @@ class PagamentoServiceTest {
     private final GatewayPagamentoEmMemoria gateway = new GatewayPagamentoEmMemoria();
     private final EventosDoGatewayProcessadosEmMemoria processados = new EventosDoGatewayProcessadosEmMemoria();
     private final OutboxEmMemoria outbox = new OutboxEmMemoria();
+    private final PedidosCanceladosEmMemoria cancelados = new PedidosCanceladosEmMemoria();
     private final RelogioDeTeste relogio = new RelogioDeTeste();
-    private final PagamentoService service = new PagamentoService(pagamentos, gateway, processados, outbox, relogio);
+    private final PagamentoService service = new PagamentoService(pagamentos, gateway, processados, cancelados, outbox, relogio);
 
     private final PedidoId pedido = new PedidoId(UUID.randomUUID());
 
@@ -152,24 +154,40 @@ class PagamentoServiceTest {
         assertThatThrownBy(() -> service.iniciar(pix())).isInstanceOf(ConflitoException.class);
     }
 
+    // Recusa cancela o pedido (saga, item 43): nova tentativa no mesmo pedido seria cobrar um pedido cancelado.
+
     @Test
-    void depoisDeRecusadoOClienteTentaDeNovo() {
+    void depoisDeRecusadoOPedidoNaoAceitaNovaTentativa() {
         gateway.aprovarCartoes(false);
         service.iniciar(cartao(CARTAO_QUALQUER));
         gateway.aprovarCartoes(true);
 
-        Pagamento segundo = service.iniciar(cartao(CARTAO_QUALQUER));
+        assertThatThrownBy(() -> service.iniciar(cartao(CARTAO_QUALQUER)))
+                .isInstanceOf(ConflitoException.class).hasMessageContaining("cancelado");
 
-        assertThat(segundo.status()).isEqualTo(StatusPagamento.APROVADO);
-        assertThat(pagamentos.listarPorPedido(pedido)).hasSize(2);
+        assertThat(pagamentos.listarPorPedido(pedido)).hasSize(1);
+        assertThat(gateway.cartoesCobrados()).hasSize(1); // a operadora não foi chamada de novo
     }
 
     @Test
-    void pixVencidoNaoImpedeUmNovoPagamento() {
+    void depoisDeExpiradoOPixOPedidoNaoAceitaNovaTentativa() {
         service.iniciar(pix());
         relogio.avancarSegundos(1800);
+        service.expirarVencidos();
 
-        assertThat(service.iniciar(cartao(CARTAO_QUALQUER)).status()).isEqualTo(StatusPagamento.APROVADO);
+        assertThatThrownBy(() -> service.iniciar(cartao(CARTAO_QUALQUER)))
+                .isInstanceOf(ConflitoException.class).hasMessageContaining("cancelado");
+    }
+
+    @Test
+    void pedidoCanceladoPorOutraCausaNaoAceitaPagamento() {
+        cancelados.registrar(pedido, relogio.instant()); // chegou o evento pedido.cancelado (estoque, expiração...)
+
+        assertThatThrownBy(() -> service.iniciar(cartao(CARTAO_QUALQUER)))
+                .isInstanceOf(ConflitoException.class).hasMessageContaining("cancelado");
+
+        assertThat(pagamentos.listarPorPedido(pedido)).isEmpty();
+        assertThat(gateway.cartoesCobrados()).isEmpty();
     }
 
     // ---- webhook (critério de pronto: repetido não gera evento duplicado) ----

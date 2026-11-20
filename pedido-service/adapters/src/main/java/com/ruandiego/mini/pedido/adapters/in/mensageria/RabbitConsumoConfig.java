@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Topologia do pedido como consumidor: a fila própria `pedido.pagamento`, ligada à exchange `mini.events`
- * pelas chaves `pagamento.aprovado` e `pagamento.estornado`, e a fila morta (DLQ) dela.
+ * pelas chaves `pagamento.aprovado`, `pagamento.estornado` e `pagamento.recusado`, e a fila morta (DLQ) dela.
  *
  * A fila tem `x-dead-letter-exchange`: quando o listener esgota as 3 tentativas (retry configurado no
  * application.yml) a mensagem é rejeitada sem voltar à fila e o broker a entrega, pela exchange
@@ -56,6 +56,11 @@ class RabbitConsumoConfig {
     @Bean
     Binding ligacaoPagamentoEstornado() {
         return new Binding(FILA_PAGAMENTO, Binding.DestinationType.QUEUE, EXCHANGE_EVENTOS, "pagamento.estornado", null);
+    }
+
+    @Bean
+    Binding ligacaoPagamentoRecusado() {
+        return new Binding(FILA_PAGAMENTO, Binding.DestinationType.QUEUE, EXCHANGE_EVENTOS, "pagamento.recusado", null);
     }
 
     @Bean

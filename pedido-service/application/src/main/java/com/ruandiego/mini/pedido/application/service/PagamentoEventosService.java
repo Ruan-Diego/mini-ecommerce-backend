@@ -71,6 +71,20 @@ public class PagamentoEventosService implements ProcessarEventoDePagamentoUseCas
         salvarEPublicar(pedido);
     }
 
+    @Override
+    public void recusado(PagamentoRecusado evento) {
+        if (!processadas.registrar(CONSUMIDOR, evento.mensagemId())) {
+            return;
+        }
+        Pedido pedido = buscar(evento.pedido());
+        if (pedido.status() != StatusPedido.AGUARDANDO_PAGAMENTO) {
+            // Já cancelado, ou já pago por outra tentativa: uma recusa antiga não pode cancelar um pedido pago.
+            return;
+        }
+        pedido.cancelar(relogio.instant());
+        salvarEPublicar(pedido);
+    }
+
     private Pedido buscar(PedidoId id) {
         return pedidos.buscarPorId(id).orElseThrow(() -> new NaoEncontradoException("pedido " + id + " não encontrado"));
     }

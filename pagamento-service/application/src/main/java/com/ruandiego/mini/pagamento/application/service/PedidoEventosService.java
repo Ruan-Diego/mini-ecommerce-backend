@@ -4,6 +4,7 @@ import com.ruandiego.mini.pagamento.application.port.in.ProcessarEventoDePedidoU
 import com.ruandiego.mini.pagamento.application.port.out.GatewayPagamento;
 import com.ruandiego.mini.pagamento.application.port.out.MensagensProcessadas;
 import com.ruandiego.mini.pagamento.application.port.out.PagamentoRepository;
+import com.ruandiego.mini.pagamento.application.port.out.PedidosCancelados;
 import com.ruandiego.mini.pagamento.application.port.out.PublicadorEventos;
 import com.ruandiego.mini.pagamento.domain.model.Pagamento;
 import com.ruandiego.mini.pagamento.domain.model.StatusPagamento;
@@ -24,14 +25,17 @@ public class PedidoEventosService implements ProcessarEventoDePedidoUseCase {
     private final PagamentoRepository pagamentos;
     private final GatewayPagamento gateway;
     private final MensagensProcessadas processadas;
+    private final PedidosCancelados cancelados;
     private final PublicadorEventos publicador;
     private final Clock relogio;
 
     public PedidoEventosService(PagamentoRepository pagamentos, GatewayPagamento gateway,
-                                MensagensProcessadas processadas, PublicadorEventos publicador, Clock relogio) {
+                                MensagensProcessadas processadas, PedidosCancelados cancelados,
+                                PublicadorEventos publicador, Clock relogio) {
         this.pagamentos = pagamentos;
         this.gateway = gateway;
         this.processadas = processadas;
+        this.cancelados = cancelados;
         this.publicador = publicador;
         this.relogio = relogio;
     }
@@ -41,6 +45,8 @@ public class PedidoEventosService implements ProcessarEventoDePedidoUseCase {
         if (!processadas.registrar(CONSUMIDOR, evento.mensagemId())) {
             return;
         }
+        // Guarda que o pedido foi cancelado: daqui em diante nenhuma tentativa de pagamento dele é aceita.
+        cancelados.registrar(evento.pedido(), relogio.instant());
         for (Pagamento pagamento : pagamentos.listarPorPedido(evento.pedido())) {
             if (pagamento.status() != StatusPagamento.APROVADO) {
                 continue; // recusado, expirado, ainda pendente ou já estornado: não há dinheiro a devolver

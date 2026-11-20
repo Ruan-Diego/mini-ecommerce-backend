@@ -7,6 +7,7 @@ import com.ruandiego.mini.pagamento.application.memoria.GatewayPagamentoEmMemori
 import com.ruandiego.mini.pagamento.application.memoria.MensagensProcessadasEmMemoria;
 import com.ruandiego.mini.pagamento.application.memoria.OutboxEmMemoria;
 import com.ruandiego.mini.pagamento.application.memoria.PagamentoRepositoryEmMemoria;
+import com.ruandiego.mini.pagamento.application.memoria.PedidosCanceladosEmMemoria;
 import com.ruandiego.mini.pagamento.application.port.in.IniciarPagamentoUseCase.Comando;
 import com.ruandiego.mini.pagamento.application.port.in.ProcessarEventoDePedidoUseCase.PedidoCancelado;
 import com.ruandiego.mini.pagamento.application.port.out.Outbox;
@@ -37,9 +38,10 @@ class PedidoEventosServiceTest {
     private final GatewayPagamentoEmMemoria gateway = new GatewayPagamentoEmMemoria();
     private final MensagensProcessadasEmMemoria processadas = new MensagensProcessadasEmMemoria();
     private final OutboxEmMemoria outbox = new OutboxEmMemoria();
+    private final PedidosCanceladosEmMemoria cancelados = new PedidosCanceladosEmMemoria();
     private final PagamentoService pagamento = new PagamentoService(pagamentos, gateway,
-            new EventosDoGatewayProcessadosEmMemoria(), outbox, relogio);
-    private final PedidoEventosService service = new PedidoEventosService(pagamentos, gateway, processadas, outbox, relogio);
+            new EventosDoGatewayProcessadosEmMemoria(), cancelados, outbox, relogio);
+    private final PedidoEventosService service = new PedidoEventosService(pagamentos, gateway, processadas, cancelados, outbox, relogio);
 
     private final PedidoId pedido = new PedidoId(UUID.randomUUID());
 
@@ -105,6 +107,13 @@ class PedidoEventosServiceTest {
         assertThat(status()).isEqualTo(StatusPagamento.RECUSADO);
         assertThat(gateway.estornos()).isEmpty();
         assertThat(tipos()).containsExactly("pagamento.recusado");
+    }
+
+    @Test
+    void pedidoCanceladoFicaRegistradoParaNaoAceitarPagamentoDepois() {
+        service.cancelado(cancelado());
+
+        assertThat(cancelados.estaCancelado(pedido)).isTrue();
     }
 
     @Test

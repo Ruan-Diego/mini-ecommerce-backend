@@ -303,6 +303,22 @@ class PedidoIntegracaoTest {
     }
 
     @Test
+    void pagamentoRecusadoCancelaOPedidoEPublicaPedidoCanceladoEMensagemRepetidaNaoFazNada() throws Exception {
+        criar("ana");
+        String mensagem = UUID.randomUUID().toString();
+
+        enviarEventoDePagamento("pagamento.recusado", mensagem, "ana", "219.90", null);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("CANCELADO"));
+        enviarEventoDePagamento("pagamento.recusado", mensagem, "ana", "219.90", null);
+        enviarEventoDePagamento("pagamento.recusado", UUID.randomUUID().toString(), "ana", "219.90", null);
+        Thread.sleep(1_500);
+
+        assertThat(jdbc.queryForList("SELECT tipo FROM outbox ORDER BY seq", String.class))
+                .containsExactly("pedido.criado", "pedido.cancelado");
+        assertThat(rabbit.receive("pedido.pagamento.dlq")).isNull();
+    }
+
+    @Test
     void pagamentoEstornadoCancelaOPedidoPago() throws Exception {
         criar("ana");
         enviarEventoDePagamento("pagamento.aprovado", UUID.randomUUID().toString(), "ana", "219.90", null);
@@ -528,6 +544,12 @@ class PedidoIntegracaoTest {
             public void estornado(PagamentoEstornado evento) {
                 chamadas.incrementAndGet();
                 real.estornado(evento);
+            }
+
+            @Override
+            public void recusado(PagamentoRecusado evento) {
+                chamadas.incrementAndGet();
+                real.recusado(evento);
             }
         }
 
