@@ -1,0 +1,33 @@
+# OpenTelemetry Collector: único ponto de entrada da telemetria dos serviços.
+# O Java agent de cada serviço manda traces e logs por OTLP (porta 4318, HTTP); o collector repassa
+# traces ao Tempo e logs ao Loki. Métricas não passam por aqui: o Prometheus lê o /actuator/prometheus.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # Loki 3 recebe OTLP nativo; trace_id e span_id viram metadados estruturados de cada linha de log.
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/loki]

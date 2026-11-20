@@ -96,6 +96,14 @@ class GatewayRotasTest {
                 .expectHeader().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN);
     }
 
+    /** Gateway e serviço devolvem o X-Trace-Id; a resposta sai com um só (DedupeResponseHeader). */
+    @Test
+    void respostaTemUmSoTraceId() {
+        cliente.get().uri("/api/catalogo/produtos").exchange()
+                .expectStatus().isOk()
+                .expectHeader().values("X-Trace-Id", valores -> assertThat(valores).hasSize(1));
+    }
+
     @Test
     void expoeHealthParaOHealthcheckDoCompose() {
         cliente.get().uri("/actuator/health").exchange()
@@ -110,6 +118,11 @@ class GatewayRotasTest {
                 caminhoRecebido.set(troca.getRequestMethod() + " " + troca.getRequestURI() + " sessao=" + troca.getRequestHeaders().getFirst("X-Sessao-Id"));
                 byte[] corpo = "{\"itens\":[]}".getBytes(StandardCharsets.UTF_8);
                 troca.getResponseHeaders().add("Content-Type", "application/json");
+                // Como os serviços reais (TraceIdFilter): devolve o X-Trace-Id que recebeu.
+                String traceId = troca.getRequestHeaders().getFirst("X-Trace-Id");
+                if (traceId != null) {
+                    troca.getResponseHeaders().add("X-Trace-Id", traceId);
+                }
                 troca.sendResponseHeaders(200, corpo.length);
                 troca.getResponseBody().write(corpo);
                 troca.close();

@@ -1,0 +1,23 @@
+# Tempo em modo monolítico, guardando os traces no disco do container (volume tempo-data).
+# Suficiente para desenvolvimento; em produção o armazenamento seria um bucket (S3, GCS).
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal
+
+compactor:
+  compaction:
+    block_retention: 72h

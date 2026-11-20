@@ -33,7 +33,7 @@ class SegurancaConfig {
                 .csrf(AbstractHttpConfigurer::disable) // API sem cookie de sessão
                 .sessionManagement(sessao -> sessao.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(regras -> regras
-                        .requestMatchers("/actuator/health/**", "/actuator/info",
+                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.POST, "/webhooks/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/pagamentos/*/estorno").hasRole("admin")

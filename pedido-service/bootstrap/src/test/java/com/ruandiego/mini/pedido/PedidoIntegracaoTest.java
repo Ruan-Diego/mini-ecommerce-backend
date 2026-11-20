@@ -72,6 +72,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "pedido.expiracao.ligada=false",
         "spring.rabbitmq.listener.simple.retry.initial-interval=100ms"})
 @AutoConfigureMockMvc
+// Em teste o Spring Boot desliga a exportação de métricas; aqui ela fica ligada para provar o /actuator/prometheus.
+@org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability(tracing = false)
 @Import(PedidoIntegracaoTest.Infra.class)
 class PedidoIntegracaoTest {
 
@@ -567,6 +569,51 @@ class PedidoIntegracaoTest {
         assertThat(jdbc.queryForList("SELECT tipo FROM outbox", String.class)).containsExactly("pedido.enviado");
         // O cliente vê o rastreio no próprio pedido.
         mvc.perform(como("ana", get("/pedidos/" + id))).andExpect(jsonPath("$.codigoRastreio").value("BR123456789"));
+    }
+
+    // ---- observabilidade ----
+
+    /**
+     * O trace atravessa a outbox: o pedido é criado dentro de um span (o que o Java agent faria na requisição) e o
+     * relay, depois e fora dele, publica a mensagem com o mesmo `traceparent`. O evento confirmado conta na
+     * métrica de negócio exposta ao Prometheus.
+     */
+    @Test
+    void traceDaRequisicaoChegaNaMensagemEOEventoContaNaMetrica() throws Exception {
+        String trace = "4bf92f3577b34da6a3ce929d0e0e4736";
+        String span = "00f067aa0ba902b7";
+        io.opentelemetry.api.trace.SpanContext contexto = io.opentelemetry.api.trace.SpanContext.create(trace, span,
+                io.opentelemetry.api.trace.TraceFlags.getSampled(), io.opentelemetry.api.trace.TraceState.getDefault());
+        double antes = contadorDeEventos("pedido.criado");
+        // Contador de tipo que ainda não aconteceu já existe (0) desde a subida: o Prometheus vê o "antes".
+        assertThat(metricas.find("mini.eventos.publicados").tag("tipo", "pedido.entregue").counter()).isNotNull();
+
+        try (var ignorado = io.opentelemetry.api.trace.Span.wrap(contexto).makeCurrent()) {
+            criar("ana");
+        }
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM outbox", String.class))
+                .isEqualTo("00-" + trace + "-" + span + "-01");
+
+        assertThat(relay.publicarPendentes(10)).isEqualTo(1);
+
+        Message mensagem = rabbit.receive(FILA_DE_TESTE, 5_000);
+        assertThat(mensagem).isNotNull();
+        assertThat((String) mensagem.getMessageProperties().getHeader("traceparent"))
+                .isEqualTo("00-" + trace + "-" + span + "-01");
+        assertThat((String) mensagem.getMessageProperties().getHeader("x-trace-id")).isEqualTo(trace);
+        assertThat(contadorDeEventos("pedido.criado")).isEqualTo(antes + 1);
+        mvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.containsString("mini_eventos_publicados_total{")));
+    }
+
+    @Autowired
+    private io.micrometer.core.instrument.MeterRegistry metricas;
+
+    private double contadorDeEventos(String tipo) {
+        var contador = metricas.find("mini.eventos.publicados").tag("tipo", tipo).counter();
+        return contador == null ? 0 : contador.count();
     }
 
     @TestConfiguration(proxyBeanMethods = false)

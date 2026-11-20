@@ -80,4 +80,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  # Métricas para o Prometheus (/actuator/prometheus). O histograma do HTTP permite calcular p95 no Grafana.
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+mini:
+  eventos:
+    # Tipos de evento que este serviço publica: os contadores mini_eventos_publicados_total nascem com 0.
+    tipos: pedido.criado,pedido.pago,pedido.em-separacao,pedido.enviado,pedido.entregue,pedido.cancelado

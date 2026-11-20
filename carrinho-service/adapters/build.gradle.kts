@@ -15,6 +15,9 @@ dependencies {
     runtimeOnly("com.mysql:mysql-connector-j")
     // Eventos do catálogo (PrecoAlterado): RabbitMQ.
     implementation("org.springframework.boot:spring-boot-starter-amqp")
+    // Só a API do OpenTelemetry (o Java agent, quando presente, fornece a implementação) e o Micrometer das métricas.
+    implementation("io.opentelemetry:opentelemetry-api")
+    implementation("io.micrometer:micrometer-core")
     // Carrinho de visitante: Redis (com expiração).
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 

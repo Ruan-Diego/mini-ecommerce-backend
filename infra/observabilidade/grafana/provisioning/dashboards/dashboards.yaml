@@ -1,0 +1,12 @@
+# Carrega os dashboards (um por serviço) da pasta montada no container. Editar pela interface não persiste:
+# altere o JSON (ou o gerador gerar-dashboards.mjs) e reinicie o Grafana.
+apiVersion: 1
+
+providers:
+  - name: mini-ecommerce
+    folder: Mini E-commerce
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

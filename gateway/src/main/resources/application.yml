@@ -28,6 +28,9 @@ spring:
                   - "http://localhost:5178" # mfe-admin
                 allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
                 allowed-headers: ["*"]
+          # O gateway devolve o X-Trace-Id e o serviço também: fica só um (o primeiro, que é o mesmo id).
+          default-filters:
+            - DedupeResponseHeader=X-Trace-Id, RETAIN_FIRST
           routes:
             - id: catalogo
               uri: ${CATALOGO_URL:http://localhost:8081}
@@ -71,4 +74,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway
+        include: health,info,gateway,prometheus
+  # Métricas para o Prometheus (/actuator/prometheus). O histograma do HTTP permite calcular p95 no Grafana.
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true

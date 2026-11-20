@@ -5,6 +5,8 @@ plugins {
 dependencies {
     implementation(project(":pagamento-service:adapters"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // /actuator/prometheus: métricas HTTP, JVM e de negócio (mini_*) para o Prometheus.
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-web")
     // Resource server: valida o JWT do Keycloak; o sub do token é o dono do pagamento.
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
