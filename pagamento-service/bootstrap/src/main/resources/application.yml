@@ -40,6 +40,18 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:8180/realms/mini/protocol/openid-connect/certs}
 
 pagamento:
+  # Qual adapter do port GatewayPagamento vale: fake (padrão, sem rede) ou mercadopago (sandbox).
+  # A troca é só esta propriedade: domain e application não mudam.
+  gateway: ${PAGAMENTO_GATEWAY:fake}
+  mercadopago:
+    # Só lidas com gateway=mercadopago. Credenciais de TESTE do painel do Mercado Pago (nunca as de produção).
+    url: ${MERCADOPAGO_URL:https://api.mercadopago.com}
+    access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
+    public-key: ${MERCADOPAGO_PUBLIC_KEY:}
+    webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+    email-pagador: ${MERCADOPAGO_EMAIL_PAGADOR:test_user@testuser.com}
+    # URL pública deste serviço para o Mercado Pago avisar (ex.: túnel ngrok .../api/pagamentos/webhooks/gateway).
+    url-notificacao: ${MERCADOPAGO_URL_NOTIFICACAO:}
   webhook:
     # Segredo compartilhado com o gateway de pagamento (cabeçalho X-Webhook-Segredo). O valor padrão é só
     # para desenvolvimento local: em qualquer outro ambiente, defina WEBHOOK_SEGREDO.

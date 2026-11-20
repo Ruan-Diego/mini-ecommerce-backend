@@ -2,6 +2,7 @@ package com.ruandiego.mini.pagamento.adapters.out.gateway;
 
 import com.ruandiego.mini.kernel.Dinheiro;
 import com.ruandiego.mini.pagamento.application.port.out.GatewayPagamento;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -15,6 +16,7 @@ import java.util.UUID;
  * O número do cartão é lido para decidir e descartado: não é guardado nem registrado em log.
  */
 @Component
+@ConditionalOnProperty(name = "pagamento.gateway", havingValue = "fake", matchIfMissing = true)
 public class GatewayFakeAdapter implements GatewayPagamento {
 
     @Override
