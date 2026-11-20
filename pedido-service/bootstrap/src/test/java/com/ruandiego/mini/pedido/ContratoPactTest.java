@@ -97,11 +97,40 @@ class ContratoPactTest {
     @State("existe o pedido 22222222-2222-4222-8222-222222222222 do cliente logado")
     void pedidoDoCliente() {
         limpar();
+        salvar(PEDIDO, CLIENTE, StatusPedido.PAGO);
+    }
+
+    @State("o cliente logado não tem pedidos")
+    void semPedidos() {
+        limpar();
+    }
+
+    @State("o pedido 44444444-4444-4444-8444-444444444444 é de outro cliente")
+    void pedidoDeOutroCliente() {
+        limpar();
+        salvar(new PedidoId(UUID.fromString("44444444-4444-4444-8444-444444444444")), "outro-cliente", StatusPedido.PAGO);
+    }
+
+    @State("o pedido 22222222-2222-4222-8222-222222222222 do cliente logado está aguardando pagamento")
+    void pedidoAguardandoPagamento() {
+        limpar();
+        salvar(PEDIDO, CLIENTE, StatusPedido.AGUARDANDO_PAGAMENTO);
+    }
+
+    @State("o pedido 22222222-2222-4222-8222-222222222222 do cliente logado já foi enviado")
+    void pedidoEnviado() {
+        limpar();
+        salvar(PEDIDO, CLIENTE, StatusPedido.ENVIADO);
+    }
+
+    /** Grava um pedido pronto pelo port (como se tivesse passado pelos status anteriores). */
+    private void salvar(PedidoId id, String cliente, StatusPedido status) {
         Instant criadoEm = Instant.parse("2026-11-20T12:00:00Z");
-        pedidos.salvar(Pedido.reconstituir(PEDIDO, new ClienteId(CLIENTE),
+        pedidos.salvar(Pedido.reconstituir(id, new ClienteId(cliente),
                 List.of(new ItemPedido(PRODUTO, "Esfera Chrome", Dinheiro.de("100.00"), 2)),
                 new EnderecoEntrega("Ana Souza", "01310100", "Av. Paulista", "1000", null, "Bela Vista", "São Paulo", "SP"),
-                new Frete("padrao", "Padrão", Dinheiro.de("19.90"), 7), StatusPedido.PAGO, criadoEm, criadoEm));
+                new Frete("padrao", "Padrão", Dinheiro.de("19.90"), 7), status, criadoEm, criadoEm,
+                status == StatusPedido.ENVIADO ? "BR123456789" : null));
     }
 
     /** Cada interação começa do zero; o produto do contrato (R$ 100,00) está sempre no catálogo falso. */
