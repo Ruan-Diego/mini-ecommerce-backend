@@ -27,6 +27,8 @@ class RabbitConsumoConfig {
     static final String EXCHANGE_MORTAS = "mini.events.dlx";
     static final String FILA_PAGAMENTO = "pedido.pagamento";
     static final String FILA_PAGAMENTO_DLQ = "pedido.pagamento.dlq";
+    static final String FILA_ESTOQUE = "pedido.estoque";
+    static final String FILA_ESTOQUE_DLQ = "pedido.estoque.dlq";
 
     @Bean
     Queue filaPagamento() {
@@ -59,6 +61,30 @@ class RabbitConsumoConfig {
     @Bean
     Binding ligacaoDaFilaMorta(Queue filaPagamentoDlq, DirectExchange exchangeMortas) {
         return BindingBuilder.bind(filaPagamentoDlq).to(exchangeMortas).with(FILA_PAGAMENTO);
+    }
+
+    /** Fila dos eventos do estoque (`estoque.indisponivel`), com a mesma DLQ por exchange morta das outras. */
+    @Bean
+    Queue filaEstoque() {
+        return QueueBuilder.durable(FILA_ESTOQUE)
+                .deadLetterExchange(EXCHANGE_MORTAS)
+                .deadLetterRoutingKey(FILA_ESTOQUE)
+                .build();
+    }
+
+    @Bean
+    Queue filaEstoqueDlq() {
+        return QueueBuilder.durable(FILA_ESTOQUE_DLQ).build();
+    }
+
+    @Bean
+    Binding ligacaoEstoqueIndisponivel() {
+        return new Binding(FILA_ESTOQUE, Binding.DestinationType.QUEUE, EXCHANGE_EVENTOS, "estoque.indisponivel", null);
+    }
+
+    @Bean
+    Binding ligacaoDaFilaMortaDoEstoque(Queue filaEstoqueDlq, DirectExchange exchangeMortas) {
+        return BindingBuilder.bind(filaEstoqueDlq).to(exchangeMortas).with(FILA_ESTOQUE);
     }
 
     /** JSON em vez da serialização Java padrão. O tipo vem do parâmetro do listener, não de um cabeçalho do publicador. */
