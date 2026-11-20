@@ -53,7 +53,7 @@ class PrecoAlteradoListenerTest {
 
     @Test
     void mensagemValidaAtualizaOPrecoComAvisoDoValorAntigo() {
-        listener.aoReceber(mensagem(ESFERA.toString(), "120.00", "2026-11-19T12:00:00.123456Z"));
+        listener.aoReceber(mensagem(ESFERA.toString(), "120.00", "2026-11-19T12:00:00.123456Z"), null);
 
         var item = service.obter(Identidade.cliente(ANA)).itens().get(0);
         assertThat(item.precoUnitario()).isEqualTo(Dinheiro.de("120.00"));
@@ -64,8 +64,8 @@ class PrecoAlteradoListenerTest {
     void mensagemRepetidaNaoMudaNada() {
         PrecoAlteradoMensagem m = mensagem(ESFERA.toString(), "120.00", "2026-11-19T12:00:00Z");
 
-        listener.aoReceber(m);
-        listener.aoReceber(m);
+        listener.aoReceber(m, null);
+        listener.aoReceber(m, null);
 
         var item = service.obter(Identidade.cliente(ANA)).itens().get(0);
         assertThat(item.precoUnitario()).isEqualTo(Dinheiro.de("120.00"));
@@ -74,15 +74,15 @@ class PrecoAlteradoListenerTest {
 
     @Test
     void camposDesconhecidosNaoImportamMasCamposInvalidosSaoRejeitadosSemReentrega() {
-        assertThatThrownBy(() -> listener.aoReceber(mensagem("nao-e-uuid", "120.00", "2026-11-19T12:00:00Z")))
+        assertThatThrownBy(() -> listener.aoReceber(mensagem("nao-e-uuid", "120.00", "2026-11-19T12:00:00Z"), null))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
-        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), null, "2026-11-19T12:00:00Z")))
+        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), null, "2026-11-19T12:00:00Z"), null))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
-        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), "120.00", "ontem")))
+        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), "120.00", "ontem"), null))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
-        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), "120.00", null)))
+        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), "120.00", null), null))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
-        assertThatThrownBy(() -> listener.aoReceber(mensagem(null, "120.00", "2026-11-19T12:00:00Z")))
+        assertThatThrownBy(() -> listener.aoReceber(mensagem(null, "120.00", "2026-11-19T12:00:00Z"), null))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
 
         assertThat(service.obter(Identidade.cliente(ANA)).itens().get(0).precoAlterado()).isFalse();
@@ -90,9 +90,9 @@ class PrecoAlteradoListenerTest {
 
     @Test
     void precoZeroOuNegativoEhRejeitadoSemReentrega() {
-        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), "0.00", "2026-11-19T12:00:00Z")))
+        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), "0.00", "2026-11-19T12:00:00Z"), null))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
-        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), "-5.00", "2026-11-19T12:00:00Z")))
+        assertThatThrownBy(() -> listener.aoReceber(mensagem(ESFERA.toString(), "-5.00", "2026-11-19T12:00:00Z"), null))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
 
         assertThat(service.obter(Identidade.cliente(ANA)).itens().get(0).precoUnitario())

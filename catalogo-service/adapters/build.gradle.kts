@@ -12,6 +12,8 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")
+    // Relay da outbox: publica os eventos no RabbitMQ.
+    implementation("org.springframework.boot:spring-boot-starter-amqp")
 
     // Testes de integração: MySQL de verdade num container, rodando os mesmos contratos do adapter em memória.
     testImplementation(testFixtures(project(":catalogo-service:application")))

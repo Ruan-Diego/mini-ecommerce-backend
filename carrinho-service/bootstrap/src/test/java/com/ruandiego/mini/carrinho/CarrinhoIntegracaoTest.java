@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * com um catálogo falso. O Flyway cria o schema, o Hibernate valida as entidades e o critério de pronto
  * da issue é provado pelo HTTP: itens adicionados como visitante continuam no carrinho depois do login.
  */
-@SpringBootTest
+@SpringBootTest(properties = "spring.rabbitmq.listener.simple.retry.initial-interval=100ms")
 @AutoConfigureMockMvc
 @Import(CarrinhoIntegracaoTest.Infra.class)
 class CarrinhoIntegracaoTest {
@@ -86,7 +86,7 @@ class CarrinhoIntegracaoTest {
         assertThat(contarCarrinhos(cliente)).isZero();
 
         // Primeiro acesso autenticado: o carrinho passa a ser do cliente, gravado no MySQL.
-        mvc.perform(get("/carrinhos/atual").header("X-Sessao-Id", sessao).header("X-Cliente-Id", cliente))
+        mvc.perform(get("/carrinhos/atual").header("X-Sessao-Id", sessao).with(jwtDe(cliente)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quantidadeTotal").value(3))
                 .andExpect(jsonPath("$.itens[0].produtoId").value(PRODUTO_ID));
@@ -94,15 +94,15 @@ class CarrinhoIntegracaoTest {
         assertThat(redis.hasKey("carrinho:visitante:" + sessao)).isFalse();
 
         // Depois, só com o cliente (sem a sessão): os itens continuam lá.
-        mvc.perform(get("/carrinhos/atual").header("X-Cliente-Id", cliente))
+        mvc.perform(get("/carrinhos/atual").with(jwtDe(cliente)))
                 .andExpect(jsonPath("$.quantidadeTotal").value(3));
 
         // Cupom e checkout sobre o carrinho já unido.
-        mvc.perform(post("/carrinhos/atual/cupom").header("X-Cliente-Id", cliente)
+        mvc.perform(post("/carrinhos/atual/cupom").with(jwtDe(cliente))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"codigo\":\"bemvindo\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.desconto").value(30.00));
-        mvc.perform(post("/carrinhos/atual/checkout").header("X-Cliente-Id", cliente))
+        mvc.perform(post("/carrinhos/atual/checkout").with(jwtDe(cliente)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(270.00));
     }
@@ -118,8 +118,8 @@ class CarrinhoIntegracaoTest {
     void mudancaDePrecoPublicadaNoRabbitAparecePeloHttpComAvisoDoValorAntigo() throws Exception {
         String sessao = "sessao-" + UUID.randomUUID();
         String cliente = "cliente-" + UUID.randomUUID();
-        adicionar("X-Cliente-Id", cliente, PRODUTO_ID_2);
-        adicionar("X-Cliente-Id", cliente, PRODUTO_ID);
+        adicionarComoCliente(cliente, PRODUTO_ID_2);
+        adicionarComoCliente(cliente, PRODUTO_ID);
         adicionar("X-Sessao-Id", sessao, PRODUTO_ID);
 
         // A nova (120 às 12:01), a duplicata dela e, por último, uma velha atrasada (90 às 12:00): sem o descarte
@@ -131,11 +131,11 @@ class CarrinhoIntegracaoTest {
         publicar(PRODUTO_ID_2, "80.00", "2026-11-19T12:02:00Z");
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
-                mvc.perform(get("/carrinhos/atual").header("X-Cliente-Id", cliente))
+                mvc.perform(get("/carrinhos/atual").with(jwtDe(cliente)))
                         .andExpect(jsonPath("$.itens[?(@.produtoId=='" + PRODUTO_ID_2 + "')].precoUnitario")
                                 .value(80.00)));
 
-        mvc.perform(get("/carrinhos/atual").header("X-Cliente-Id", cliente))
+        mvc.perform(get("/carrinhos/atual").with(jwtDe(cliente)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.itens[?(@.produtoId=='" + PRODUTO_ID + "')].precoUnitario").value(120.00))
                 .andExpect(jsonPath("$.itens[?(@.produtoId=='" + PRODUTO_ID + "')].precoAlterado").value(true))
@@ -150,16 +150,88 @@ class CarrinhoIntegracaoTest {
     }
 
     @Test
-    void mensagemMalformadaNaoTravaAFila() throws Exception {
+    void mensagemMalformadaNaoTravaAFilaEVaiParaADlqDepoisDeTresTentativas() throws Exception {
         String cliente = "cliente-" + UUID.randomUUID();
-        adicionar("X-Cliente-Id", cliente, PRODUTO_ID);
+        adicionarComoCliente(cliente, PRODUTO_ID);
 
-        rabbit.send("catalogo.eventos", "catalogo.preco-alterado", json("{\"produtoId\":\"lixo\",\"precoNovo\":1}"));
+        rabbit.send("mini.events", "catalogo.preco-alterado", json("{\"produtoId\":\"lixo\",\"precoNovo\":1}"));
         publicar(PRODUTO_ID, "150.00", "2026-11-19T13:00:00Z");
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
-                mvc.perform(get("/carrinhos/atual").header("X-Cliente-Id", cliente))
+                mvc.perform(get("/carrinhos/atual").with(jwtDe(cliente)))
                         .andExpect(jsonPath("$.itens[0].precoUnitario").value(150.00)));
+
+        // A malformada foi tentada 3 vezes (retry) e o broker a entregou na fila morta, à vista no painel do RabbitMQ.
+        Message morta = rabbit.receive("carrinho.preco-alterado.dlq", 10_000);
+        assertThat(morta).isNotNull();
+        assertThat(new String(morta.getBody(), StandardCharsets.UTF_8)).contains("lixo");
+        assertThat(morta.getMessageProperties().getHeaders()).containsKey("x-death");
+    }
+
+    /**
+     * O pedido-service publica `pedido.criado` na exchange compartilhada; o carrinho do cliente esvazia. A
+     * mensagem usa o JSON real da outbox do pedido (com campos que o carrinho ignora). O carrinho de outro
+     * cliente e o de um visitante ficam intactos. Uma mensagem sem cliente vai para a DLQ sem travar a fila.
+     */
+    @Test
+    void pedidoCriadoPublicadoNoRabbitEsvaziaOCarrinhoDoClienteEVaiParaADlqSeMalformado() throws Exception {
+        String cliente = "cliente-" + UUID.randomUUID();
+        String outro = "cliente-" + UUID.randomUUID();
+        String sessao = "sessao-" + UUID.randomUUID();
+        adicionarComoCliente(cliente, PRODUTO_ID);
+        adicionarComoCliente(outro, PRODUTO_ID);
+        adicionar("X-Sessao-Id", sessao, PRODUTO_ID);
+
+        rabbit.send("mini.events", "pedido.criado", json("{\"pedidoId\":\"" + UUID.randomUUID() + "\",\"clienteId\":\""
+                + cliente + "\",\"total\":269.90,\"ocorridoEm\":\"2026-11-20T15:00:00Z\"}"));
+        rabbit.send("mini.events", "pedido.criado", json("{\"pedidoId\":\"p-lixo\",\"clienteId\":\"\"}"));
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
+                mvc.perform(get("/carrinhos/atual").with(jwtDe(cliente)))
+                        .andExpect(jsonPath("$.quantidadeTotal").value(0)));
+        mvc.perform(get("/carrinhos/atual").with(jwtDe(outro))).andExpect(jsonPath("$.quantidadeTotal").value(1));
+        mvc.perform(get("/carrinhos/atual").header("X-Sessao-Id", sessao)).andExpect(jsonPath("$.quantidadeTotal").value(1));
+
+        Message morta = rabbit.receive("carrinho.pedido-criado.dlq", 10_000);
+        assertThat(morta).isNotNull();
+        assertThat(new String(morta.getBody(), StandardCharsets.UTF_8)).contains("p-lixo");
+    }
+
+    /** A trava desta mudança: "ser cliente" exige JWT válido; o header antigo não vale mais nada. */
+    @Test
+    void xClienteIdFalsificadoNaoDaAcessoAoCarrinhoDeNinguem() throws Exception {
+        String cliente = "cliente-" + UUID.randomUUID();
+        adicionarComoCliente(cliente, PRODUTO_ID);
+
+        // Sem token e sem sessão, o X-Cliente-Id é ignorado: nem identificação existe.
+        mvc.perform(get("/carrinhos/atual").header("X-Cliente-Id", cliente))
+                .andExpect(status().isBadRequest());
+        // Com uma sessão qualquer, quem responde é o carrinho de visitante (vazio), nunca o do cliente.
+        mvc.perform(get("/carrinhos/atual").header("X-Cliente-Id", cliente).header("X-Sessao-Id", "intruso-" + UUID.randomUUID()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantidadeTotal").value(0));
+    }
+
+    @Test
+    void checkoutSemTokenEhNaoAutenticadoETokenInvalidoNemChegaAoController() throws Exception {
+        mvc.perform(post("/carrinhos/atual/checkout").header("X-Sessao-Id", "s1"))
+                .andExpect(status().isUnauthorized());
+        // Bearer malformado/não assinado pelo Keycloak: o Spring Security barra antes de qualquer regra do carrinho.
+        mvc.perform(get("/carrinhos/atual").header("X-Sessao-Id", "s1").header("Authorization", "Bearer isto-nao-e-um-jwt"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor jwtDe(String cliente) {
+        // JWT já "validado": o filtro de segurança real roda, o que o teste dispensa é só a assinatura do Keycloak.
+        return org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt()
+                .jwt(jwt -> jwt.subject(cliente));
+    }
+
+    private void adicionarComoCliente(String cliente, String produtoId) throws Exception {
+        mvc.perform(post("/carrinhos/atual/itens").with(jwtDe(cliente))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"produtoId\":\"" + produtoId + "\",\"quantidade\":1}"))
+                .andExpect(status().isOk());
     }
 
     private void adicionar(String header, String identificacao, String produtoId) throws Exception {
@@ -170,7 +242,7 @@ class CarrinhoIntegracaoTest {
     }
 
     private void publicar(String produtoId, String precoNovo, String ocorridoEm) {
-        rabbit.send("catalogo.eventos", "catalogo.preco-alterado", json("{\"produtoId\":\"" + produtoId
+        rabbit.send("mini.events", "catalogo.preco-alterado", json("{\"produtoId\":\"" + produtoId
                 + "\",\"sku\":\"ESF-01\",\"precoAnterior\":100.00,\"precoNovo\":" + precoNovo
                 + ",\"ocorridoEm\":\"" + ocorridoEm + "\",\"campoNovoQueOCarrinhoIgnora\":true}"));
     }

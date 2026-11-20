@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Emissor esperado no claim iss (o que o navegador enxerga) e onde buscar as chaves públicas.
+          # Separados porque, no container, o Keycloak não é "localhost". Nada é buscado na subida.
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/mini}
+          jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:8180/realms/mini/protocol/openid-connect/certs}
   cloud:
     gateway:
       server:
@@ -32,6 +40,22 @@ spring:
               uri: ${CARRINHO_URL:http://localhost:8082}
               predicates:
                 - Path=/api/carrinho/**
+              filters:
+                - StripPrefix=2
+
+            # Pagamentos (cliente logado), estorno (admin) e webhook do gateway (segredo, sem JWT).
+            - id: pagamento
+              uri: ${PAGAMENTO_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/pagamentos/**
+              filters:
+                - StripPrefix=2
+
+            # Pedidos e cotação de frete: exige token (SegurancaConfig). /api/pedidos/pedidos/meus → /pedidos/meus.
+            - id: pedido
+              uri: ${PEDIDO_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/pedidos/**
               filters:
                 - StripPrefix=2
 

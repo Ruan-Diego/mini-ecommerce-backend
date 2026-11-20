@@ -4,6 +4,53 @@ server:
 spring:
   application:
     name: pedido-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/pedido
+    username: ${DB_USER:pedido}
+    password: ${DB_PASSWORD:pedido}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # O relay só dá baixa na outbox depois que o broker confirma o recebimento.
+    publisher-confirm-type: correlated
+    listener:
+      simple:
+        # 3 tentativas com espera crescente (1 s, 2 s). Esgotadas, a mensagem é rejeitada sem voltar à fila e o
+        # broker a manda para a DLQ (a fila tem x-dead-letter-exchange, veja RabbitConsumoConfig).
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 10s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/mini}
+          jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:8180/realms/mini/protocol/openid-connect/certs}
+
+pedido:
+  # API do catalogo-service, de onde vêm nome e preço dos produtos.
+  catalogo:
+    url: ${CATALOGO_URL:http://localhost:8081}
+  outbox:
+    # Intervalo entre rodadas do relay, em milissegundos.
+    intervalo: 1000
+    relay-ligado: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-}]"
 
 management:
   endpoints:

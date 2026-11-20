@@ -22,6 +22,7 @@ class MySqlDeTeste {
 
     /** Apaga os dados do catálogo, na ordem das chaves estrangeiras. O schema (Flyway) fica. */
     static void limpar(JdbcTemplate jdbc) {
+        jdbc.update("DELETE FROM outbox");
         jdbc.update("DELETE FROM imagem_produto");
         jdbc.update("DELETE FROM produto");
         jdbc.update("UPDATE categoria SET pai_id = NULL");

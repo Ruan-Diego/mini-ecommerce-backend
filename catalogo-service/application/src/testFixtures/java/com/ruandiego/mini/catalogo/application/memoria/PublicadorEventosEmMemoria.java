@@ -12,7 +12,7 @@ public class PublicadorEventosEmMemoria implements PublicadorEventos {
     private final List<DomainEvent> publicados = new ArrayList<>();
 
     @Override
-    public void publicar(List<DomainEvent> eventos) {
+    public void publicar(List<? extends DomainEvent> eventos) {
         publicados.addAll(eventos);
     }
 

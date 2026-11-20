@@ -8,12 +8,35 @@ spring:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/catalogo
     username: ${DB_USER:catalogo}
     password: ${DB_PASSWORD:catalogo}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/mini}
+          jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:8180/realms/mini/protocol/openid-connect/certs}
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # O relay só dá baixa na outbox depois que o broker confirma o recebimento.
+    publisher-confirm-type: correlated
   flyway:
     enabled: true
+
+catalogo:
+  outbox:
+    # Intervalo entre rodadas do relay, em milissegundos.
+    intervalo: 1000
+    relay-ligado: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-}]"
 
 management:
   endpoints:

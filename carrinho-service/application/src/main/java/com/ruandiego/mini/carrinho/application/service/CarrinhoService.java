@@ -7,6 +7,7 @@ import com.ruandiego.mini.carrinho.application.port.in.AdicionarItemUseCase;
 import com.ruandiego.mini.carrinho.application.port.in.AlterarQuantidadeUseCase;
 import com.ruandiego.mini.carrinho.application.port.in.AplicarCupomUseCase;
 import com.ruandiego.mini.carrinho.application.port.in.AtualizarPrecoNosCarrinhosUseCase;
+import com.ruandiego.mini.carrinho.application.port.in.EsvaziarCarrinhoDoClienteUseCase;
 import com.ruandiego.mini.carrinho.application.port.in.IniciarCheckoutUseCase;
 import com.ruandiego.mini.carrinho.application.port.in.ObterCarrinhoUseCase;
 import com.ruandiego.mini.carrinho.application.port.in.RemoverCupomUseCase;
@@ -41,7 +42,7 @@ import java.util.Optional;
  */
 public class CarrinhoService implements ObterCarrinhoUseCase, AdicionarItemUseCase, AlterarQuantidadeUseCase,
         RemoverItemUseCase, AplicarCupomUseCase, RemoverCupomUseCase, UnirCarrinhosUseCase, IniciarCheckoutUseCase,
-        AtualizarPrecoNosCarrinhosUseCase {
+        AtualizarPrecoNosCarrinhosUseCase, EsvaziarCarrinhoDoClienteUseCase {
 
     private final CarrinhoVisitanteRepository visitantes;
     private final CarrinhoClienteRepository clientes;
@@ -118,6 +119,18 @@ public class CarrinhoService implements ObterCarrinhoUseCase, AdicionarItemUseCa
         doCliente.unirCom(doVisitante.get(), relogio.instant());
         clientes.salvar(cliente, doCliente);
         visitantes.remover(sessao);
+    }
+
+    /**
+     * Esvazia o carrinho do cliente depois que virou pedido. Limite conhecido: um item adicionado no intervalo
+     * entre criar o pedido e consumir o evento (milissegundos) também é descartado.
+     */
+    @Override
+    public void esvaziar(ClienteId cliente) {
+        clientes.buscar(cliente).ifPresent(carrinho -> {
+            carrinho.esvaziar();
+            clientes.salvar(cliente, carrinho);
+        });
     }
 
     @Override
