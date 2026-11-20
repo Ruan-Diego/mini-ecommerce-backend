@@ -286,4 +286,39 @@ class CarrinhoServiceTest {
 
         assertThat(service.obter(VISITANTE).itens()).isEmpty();
     }
+
+    @Test
+    void pedidoCriadoEsvaziaOCarrinhoDoClienteComItensECupom() {
+        service.adicionar(CLIENTE, ESFERA, 2);
+        service.aplicar(CLIENTE, "DEZ");
+
+        service.esvaziar(ANA);
+
+        CarrinhoResumo depois = service.obter(CLIENTE);
+        assertThat(depois.itens()).isEmpty();
+        assertThat(depois.cupom()).isNull();
+    }
+
+    @Test
+    void esvaziarEhIdempotenteEIgnoraQuemNaoTemCarrinho() {
+        service.esvaziar(ANA); // não existe: nada acontece
+        service.adicionar(CLIENTE, ESFERA, 1);
+        service.esvaziar(ANA);
+        service.esvaziar(ANA); // reentrega da mesma mensagem
+
+        assertThat(service.obter(CLIENTE).itens()).isEmpty();
+    }
+
+    @Test
+    void esvaziarOCarrinhoDoClienteNaoMexeNoDeOutroNemNoDeVisitante() {
+        service.adicionar(CLIENTE, ESFERA, 1);
+        ClienteId bia = new ClienteId("bia");
+        service.adicionar(Identidade.cliente(bia), CUBO, 1);
+        service.adicionar(VISITANTE, CUBO, 3);
+
+        service.esvaziar(ANA);
+
+        assertThat(service.obter(Identidade.cliente(bia)).itens()).hasSize(1);
+        assertThat(service.obter(VISITANTE).quantidadeTotal()).isEqualTo(3);
+    }
 }
