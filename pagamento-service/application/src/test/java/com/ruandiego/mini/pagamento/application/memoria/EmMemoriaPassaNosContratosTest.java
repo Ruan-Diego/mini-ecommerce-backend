@@ -1,0 +1,45 @@
+package com.ruandiego.mini.pagamento.application.memoria;
+
+import com.ruandiego.mini.pagamento.application.contrato.EventosDoGatewayProcessadosContrato;
+import com.ruandiego.mini.pagamento.application.contrato.OutboxContrato;
+import com.ruandiego.mini.pagamento.application.contrato.PagamentoRepositoryContrato;
+import com.ruandiego.mini.pagamento.application.port.out.EventosDoGatewayProcessados;
+import com.ruandiego.mini.pagamento.application.port.out.Outbox;
+import com.ruandiego.mini.pagamento.application.port.out.PagamentoRepository;
+import com.ruandiego.mini.pagamento.application.port.out.PublicadorEventos;
+
+/** Os adapters em memória passam nos mesmos contratos que os adapters JPA reais. */
+class EmMemoriaPassaNosContratosTest {
+
+    static class Pagamentos extends PagamentoRepositoryContrato {
+        private final PagamentoRepositoryEmMemoria repositorio = new PagamentoRepositoryEmMemoria();
+
+        @Override
+        protected PagamentoRepository pagamentos() {
+            return repositorio;
+        }
+    }
+
+    static class Processados extends EventosDoGatewayProcessadosContrato {
+        private final EventosDoGatewayProcessadosEmMemoria registro = new EventosDoGatewayProcessadosEmMemoria();
+
+        @Override
+        protected EventosDoGatewayProcessados processados() {
+            return registro;
+        }
+    }
+
+    static class OutboxEmMemoriaContrato extends OutboxContrato {
+        private final OutboxEmMemoria outbox = new OutboxEmMemoria();
+
+        @Override
+        protected PublicadorEventos publicador() {
+            return outbox;
+        }
+
+        @Override
+        protected Outbox outbox() {
+            return outbox;
+        }
+    }
+}
