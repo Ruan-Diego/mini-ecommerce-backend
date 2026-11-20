@@ -43,6 +43,14 @@ spring:
               filters:
                 - StripPrefix=2
 
+            # Estoque: leitura livre (vitrine); ajuste em /api/estoque/admin/** só admin (SegurancaConfig).
+            - id: estoque
+              uri: ${ESTOQUE_URL:http://localhost:8085}
+              predicates:
+                - Path=/api/estoque/**
+              filters:
+                - StripPrefix=2
+
             # Pagamentos (cliente logado), estorno (admin) e webhook do gateway (segredo, sem JWT).
             - id: pagamento
               uri: ${PAGAMENTO_URL:http://localhost:8084}

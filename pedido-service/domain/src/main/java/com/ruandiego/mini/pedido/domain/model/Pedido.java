@@ -45,7 +45,11 @@ public class Pedido extends AggregateRoot {
         }
         Pedido pedido = new Pedido(PedidoId.novo(), clienteId, itens, endereco, frete,
                 StatusPedido.AGUARDANDO_PAGAMENTO, agora, agora);
-        pedido.registrar(new PedidoCriado(pedido.id.toString(), clienteId.toString(), pedido.total().valor(), agora));
+        List<PedidoCriado.Item> itensDoEvento = itens.stream()
+                .map(i -> new PedidoCriado.Item(i.produtoId().toString(), i.quantidade()))
+                .toList();
+        pedido.registrar(new PedidoCriado(pedido.id.toString(), clienteId.toString(), pedido.total().valor(),
+                itensDoEvento, agora));
         return pedido;
     }
 
