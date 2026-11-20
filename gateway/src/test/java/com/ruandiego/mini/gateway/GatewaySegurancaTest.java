@@ -47,6 +47,7 @@ class GatewaySegurancaTest {
         registro.add("KEYCLOAK_JWKS", () -> "http://localhost:" + JWKS.getAddress().getPort() + "/certs");
         registro.add("CATALOGO_URL", () -> "http://localhost:" + SERVICO.getAddress().getPort());
         registro.add("CARRINHO_URL", () -> "http://localhost:" + SERVICO.getAddress().getPort());
+        registro.add("PEDIDO_URL", () -> "http://localhost:" + SERVICO.getAddress().getPort());
     }
 
     @AfterAll
@@ -87,14 +88,12 @@ class GatewaySegurancaTest {
     @Test
     void rotaProtegidaQueNaoEAdminExigeSoOToken() {
         cliente.get().uri("/api/pedidos/pedidos/meus").exchange().expectStatus().isUnauthorized();
-        // Autenticado passa pela segurança; o 5xx/404 vem de não haver pedido-service nesta rota ainda.
+        // Cliente autenticado (sem o papel admin) passa e a rota do pedido-service responde.
         cliente.get().uri("/api/pedidos/pedidos/meus")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CHAVE, List.of("cliente"), 300))
-                .exchange().expectStatus().value(status -> {
-                    if (status == 401 || status == 403) {
-                        throw new AssertionError("era para passar pela segurança, veio " + status);
-                    }
-                });
+                .exchange().expectStatus().isOk();
+        cliente.get().uri("/api/pedidos/fretes/cotacao?cep=01310100&subtotal=100")
+                .exchange().expectStatus().isUnauthorized();
     }
 
     @Test
