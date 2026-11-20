@@ -66,7 +66,8 @@ class CarrinhoControllerTest {
     }
 
     private static MockHttpServletRequestBuilder comoCliente(MockHttpServletRequestBuilder req) {
-        return req.header("X-Cliente-Id", CLIENTE);
+        // O cliente é o Principal da requisição (na produção, o sub do JWT validado pelo bootstrap).
+        return req.principal(() -> CLIENTE);
     }
 
     private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder req, String corpo) {
