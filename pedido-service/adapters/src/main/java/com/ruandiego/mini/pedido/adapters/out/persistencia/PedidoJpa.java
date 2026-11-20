@@ -77,6 +77,9 @@ class PedidoJpa {
     @Column(name = "atualizado_em", nullable = false, columnDefinition = "datetime(6)")
     private Instant atualizadoEm;
 
+    @Column(name = "codigo_rastreio", length = 40)
+    private String codigoRastreio;
+
     /**
      * Controle de concorrência otimista: o Hibernate só grava se a linha ainda estiver na versão lida. Protege a
      * corrida entre o job de expiração e o pagamento aprovado: quem chegar depois falha em vez de sobrescrever.
@@ -101,7 +104,7 @@ class PedidoJpa {
     /** Copia os campos de um pedido do domínio para esta linha (nova ou já existente). */
     void preencher(String clienteId, StatusPedido status, String freteCodigo, String freteNome, BigDecimal freteValor,
                    int fretePrazoDias, String[] endereco, Instant criadoEm, Instant atualizadoEm,
-                   List<ItemPedidoJpa> novosItens) {
+                   String codigoRastreio, List<ItemPedidoJpa> novosItens) {
         this.clienteId = clienteId;
         this.status = status;
         this.freteCodigo = freteCodigo;
@@ -118,6 +121,7 @@ class PedidoJpa {
         this.endUf = endereco[7];
         this.criadoEm = criadoEm;
         this.atualizadoEm = atualizadoEm;
+        this.codigoRastreio = codigoRastreio;
         this.itens.clear();
         this.itens.addAll(novosItens);
     }
@@ -188,6 +192,10 @@ class PedidoJpa {
 
     Instant getAtualizadoEm() {
         return atualizadoEm;
+    }
+
+    String getCodigoRastreio() {
+        return codigoRastreio;
     }
 
     List<ItemPedidoJpa> getItens() {

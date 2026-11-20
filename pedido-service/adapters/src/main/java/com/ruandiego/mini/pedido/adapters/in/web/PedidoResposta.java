@@ -10,7 +10,8 @@ import java.util.List;
 
 /** Pedido como o REST o devolve. Valores em reais como número; datas em ISO-8601 (UTC). */
 record PedidoResposta(String id, String status, List<Item> itens, Endereco endereco, FreteResposta frete,
-                      BigDecimal subtotal, BigDecimal total, Instant criadoEm, Instant atualizadoEm) {
+                      BigDecimal subtotal, BigDecimal total, String codigoRastreio, Instant criadoEm,
+                      Instant atualizadoEm) {
 
     record Item(String produtoId, String nome, BigDecimal precoUnitario, int quantidade, BigDecimal subtotal) {
 
@@ -33,6 +34,6 @@ record PedidoResposta(String id, String status, List<Item> itens, Endereco ender
         return new PedidoResposta(pedido.id().toString(), pedido.status().name(),
                 pedido.itens().stream().map(Item::de).toList(), Endereco.de(pedido.endereco()),
                 FreteResposta.de(pedido.frete()), pedido.subtotal().valor(), pedido.total().valor(),
-                pedido.criadoEm(), pedido.atualizadoEm());
+                pedido.codigoRastreio(), pedido.criadoEm(), pedido.atualizadoEm());
     }
 }

@@ -30,7 +30,7 @@ final class PedidoMapper {
                 pedido.frete().valor().valor(), pedido.frete().prazoDias(),
                 new String[]{e.destinatario(), e.cep(), e.logradouro(), e.numero(), e.complemento(), e.bairro(),
                         e.cidade(), e.uf()},
-                pedido.criadoEm(), pedido.atualizadoEm(), itens);
+                pedido.criadoEm(), pedido.atualizadoEm(), pedido.codigoRastreio(), itens);
     }
 
     static Pedido paraDominio(PedidoJpa jpa) {
@@ -44,6 +44,6 @@ final class PedidoMapper {
         Frete frete = new Frete(jpa.getFreteCodigo(), jpa.getFreteNome(), new Dinheiro(jpa.getFreteValor()),
                 jpa.getFretePrazoDias());
         return Pedido.reconstituir(PedidoId.de(jpa.getId()), new ClienteId(jpa.getClienteId()), itens, endereco,
-                frete, jpa.getStatus(), jpa.getCriadoEm(), jpa.getAtualizadoEm());
+                frete, jpa.getStatus(), jpa.getCriadoEm(), jpa.getAtualizadoEm(), jpa.getCodigoRastreio());
     }
 }

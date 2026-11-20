@@ -9,9 +9,11 @@ import com.ruandiego.mini.pedido.application.service.PagamentoEventosService;
 import com.ruandiego.mini.pedido.application.port.out.Outbox;
 import com.ruandiego.mini.pedido.application.port.out.PedidoRepository;
 import com.ruandiego.mini.pedido.application.port.out.PublicadorEventos;
+import com.ruandiego.mini.pedido.application.service.AdministracaoPedidosService;
 import com.ruandiego.mini.pedido.application.service.PedidoService;
 import com.ruandiego.mini.pedido.application.service.RelayDoOutbox;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -20,6 +22,7 @@ import org.springframework.transaction.interceptor.MatchAlwaysTransactionAttribu
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 
 import java.time.Clock;
+import java.time.ZoneId;
 
 /**
  * Wiring do pedido: liga os services (que não conhecem Spring) aos adapters.
@@ -44,6 +47,17 @@ class PedidoConfig {
     PedidoService pedidoService(PedidoRepository pedidos, CalculadoraFrete calculadoraFrete, CatalogoConsulta catalogo,
                                 PublicadorEventos publicador, Clock relogio, PlatformTransactionManager transacoes) {
         return transacional(new PedidoService(pedidos, calculadoraFrete, catalogo, publicador, relogio), transacoes);
+    }
+
+    /**
+     * Implementa AdministrarPedidos e ConsultarIndicadores (o lado do admin). `loja.fuso` define o que é "hoje"
+     * para o painel e as datas do filtro.
+     */
+    @Bean
+    AdministracaoPedidosService administracaoPedidosService(PedidoRepository pedidos, PublicadorEventos publicador,
+                                                            Clock relogio, @Value("${loja.fuso:America/Sao_Paulo}") String fuso,
+                                                            PlatformTransactionManager transacoes) {
+        return transacional(new AdministracaoPedidosService(pedidos, publicador, relogio, ZoneId.of(fuso)), transacoes);
     }
 
     /** Implementa ProcessarEventoDePagamento: o pedido reagindo ao pagamento aprovado e ao estornado. */
