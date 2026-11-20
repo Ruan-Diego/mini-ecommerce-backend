@@ -3,10 +3,12 @@ package com.ruandiego.mini.pagamento;
 import com.ruandiego.mini.pagamento.application.port.out.BrokerMensagens;
 import com.ruandiego.mini.pagamento.application.port.out.EventosDoGatewayProcessados;
 import com.ruandiego.mini.pagamento.application.port.out.GatewayPagamento;
+import com.ruandiego.mini.pagamento.application.port.out.MensagensProcessadas;
 import com.ruandiego.mini.pagamento.application.port.out.Outbox;
 import com.ruandiego.mini.pagamento.application.port.out.PagamentoRepository;
 import com.ruandiego.mini.pagamento.application.port.out.PublicadorEventos;
 import com.ruandiego.mini.pagamento.application.service.PagamentoService;
+import com.ruandiego.mini.pagamento.application.service.PedidoEventosService;
 import com.ruandiego.mini.pagamento.application.service.RelayDoOutbox;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.context.annotation.Bean;
@@ -43,6 +45,14 @@ class PagamentoConfig {
                                       EventosDoGatewayProcessados processados, PublicadorEventos publicador,
                                       Clock relogio, PlatformTransactionManager transacoes) {
         return transacional(new PagamentoService(pagamentos, gateway, processados, publicador, relogio), transacoes);
+    }
+
+    /** Implementa ProcessarEventoDePedido: o pagamento reagindo ao pedido cancelado (compensação da saga). */
+    @Bean
+    PedidoEventosService pedidoEventosService(PagamentoRepository pagamentos, GatewayPagamento gateway,
+                                              MensagensProcessadas processadas, PublicadorEventos publicador,
+                                              Clock relogio, PlatformTransactionManager transacoes) {
+        return transacional(new PedidoEventosService(pagamentos, gateway, processadas, publicador, relogio), transacoes);
     }
 
     @Bean
