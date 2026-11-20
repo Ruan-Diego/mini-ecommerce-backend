@@ -23,7 +23,8 @@ public class Produto extends AggregateRoot {
 
     private static final int NOME_MAXIMO = 120;
     private static final int DESCRICAO_MAXIMA = 2000;
-    private static final int IMAGENS_MAXIMO = 10;
+    /** Quantas imagens um produto pode ter (cadastro, atualização ou upload). */
+    public static final int IMAGENS_MAXIMO = 5;
 
     private final ProdutoId id;
     private final Sku sku;
@@ -87,6 +88,21 @@ public class Produto extends AggregateRoot {
         this.descricao = validarDescricao(novaDescricao);
         this.imagens = validarImagens(novasImagens);
         this.categoriaId = Objects.requireNonNull(novaCategoriaId, "novaCategoriaId");
+    }
+
+    /** Acrescenta uma imagem no fim da galeria, respeitando o limite de {@link #IMAGENS_MAXIMO}. */
+    public void adicionarImagem(Imagem imagem) {
+        Objects.requireNonNull(imagem, "imagem");
+        if (!aceitaMaisImagens()) {
+            throw new RegraDeNegocioException("produto aceita até " + IMAGENS_MAXIMO + " imagens");
+        }
+        List<Imagem> novas = new java.util.ArrayList<>(imagens);
+        novas.add(imagem);
+        this.imagens = List.copyOf(novas);
+    }
+
+    public boolean aceitaMaisImagens() {
+        return imagens.size() < IMAGENS_MAXIMO;
     }
 
     public void alterarSlug(Slug novoSlug) {
