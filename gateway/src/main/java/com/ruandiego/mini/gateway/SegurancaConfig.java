@@ -26,7 +26,7 @@ import java.util.Map;
  * Regras (a ordem importa, vale a primeira que casar):
  * - pré-voo CORS e health: livres;
  * - qualquer /admin/** de qualquer serviço: papel admin (sem token → 401, token sem o papel → 403);
- * - catálogo (leitura) e carrinho: livres, porque visitante também navega e monta carrinho;
+ * - catálogo e estoque (leitura) e carrinho: livres, porque visitante também navega e monta carrinho;
  * - todo o resto (pedidos, pagamentos, conta): exige token.
  * Token inválido ou expirado é 401 mesmo numa rota livre: quem manda token, manda um token bom.
  */
@@ -47,6 +47,7 @@ class SegurancaConfig {
                         .pathMatchers(HttpMethod.POST, "/api/pagamentos/webhooks/**").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/pagamentos/pagamentos/*/estorno").hasRole("admin")
                         .pathMatchers(HttpMethod.GET, "/api/catalogo/**").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/estoque/**").permitAll()
                         .pathMatchers("/api/carrinho/**").permitAll()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(conversor())))

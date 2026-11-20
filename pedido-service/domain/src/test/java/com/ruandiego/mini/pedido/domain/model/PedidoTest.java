@@ -66,6 +66,8 @@ class PedidoTest {
             assertThat(evento.tipo()).isEqualTo("pedido.criado");
             assertThat(evento.pedidoId()).isEqualTo(pedido.id().toString());
             assertThat(evento.total()).isEqualByComparingTo("270.40");
+            assertThat(evento.itens()).hasSize(pedido.itens().size())
+                    .allSatisfy(item -> assertThat(item.quantidade()).isPositive());
         });
     }
 
