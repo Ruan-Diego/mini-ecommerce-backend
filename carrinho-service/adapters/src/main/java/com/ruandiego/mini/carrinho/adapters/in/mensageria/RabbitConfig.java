@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 class RabbitConfig {
 
-    static final String EXCHANGE_CATALOGO = "catalogo.eventos";
+    static final String EXCHANGE_CATALOGO = "mini.events";
     static final String CHAVE_PRECO_ALTERADO = "catalogo.preco-alterado";
     static final String FILA_PRECO_ALTERADO = "carrinho.preco-alterado";
 

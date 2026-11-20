@@ -37,6 +37,10 @@ pedido:
     intervalo: 1000
     relay-ligado: true
 
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-}]"
+
 management:
   endpoints:
     web:

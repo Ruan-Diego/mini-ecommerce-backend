@@ -42,6 +42,10 @@ pagamento:
     intervalo-de-expiracao: 60000
     expiracao-ligada: true
 
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-}]"
+
 management:
   endpoints:
     web:

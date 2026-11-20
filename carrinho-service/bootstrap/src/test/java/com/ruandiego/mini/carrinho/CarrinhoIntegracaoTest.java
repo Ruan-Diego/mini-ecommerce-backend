@@ -154,7 +154,7 @@ class CarrinhoIntegracaoTest {
         String cliente = "cliente-" + UUID.randomUUID();
         adicionar("X-Cliente-Id", cliente, PRODUTO_ID);
 
-        rabbit.send("catalogo.eventos", "catalogo.preco-alterado", json("{\"produtoId\":\"lixo\",\"precoNovo\":1}"));
+        rabbit.send("mini.events", "catalogo.preco-alterado", json("{\"produtoId\":\"lixo\",\"precoNovo\":1}"));
         publicar(PRODUTO_ID, "150.00", "2026-11-19T13:00:00Z");
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
@@ -170,7 +170,7 @@ class CarrinhoIntegracaoTest {
     }
 
     private void publicar(String produtoId, String precoNovo, String ocorridoEm) {
-        rabbit.send("catalogo.eventos", "catalogo.preco-alterado", json("{\"produtoId\":\"" + produtoId
+        rabbit.send("mini.events", "catalogo.preco-alterado", json("{\"produtoId\":\"" + produtoId
                 + "\",\"sku\":\"ESF-01\",\"precoAnterior\":100.00,\"precoNovo\":" + precoNovo
                 + ",\"ocorridoEm\":\"" + ocorridoEm + "\",\"campoNovoQueOCarrinhoIgnora\":true}"));
     }

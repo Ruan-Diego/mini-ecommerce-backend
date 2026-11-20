@@ -32,6 +32,10 @@ carrinho:
   catalogo:
     url: ${CATALOGO_URL:http://localhost:8081}
 
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-}]"
+
 management:
   endpoints:
     web:

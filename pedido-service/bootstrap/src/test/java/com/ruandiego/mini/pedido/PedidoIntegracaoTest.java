@@ -250,7 +250,7 @@ class PedidoIntegracaoTest {
 
         @Bean
         Binding ligacaoDaFilaDeTeste() {
-            return new Binding(FILA_DE_TESTE, Binding.DestinationType.QUEUE, "pedido.eventos", "pedido.#", null);
+            return new Binding(FILA_DE_TESTE, Binding.DestinationType.QUEUE, "mini.events", "pedido.#", null);
         }
 
         /**
