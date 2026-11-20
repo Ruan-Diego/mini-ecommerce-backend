@@ -20,9 +20,10 @@ class MySqlDeTeste {
         return new MySQLContainer<>("mysql:8.4");
     }
 
-    /** Apaga pedidos e outbox, na ordem da chave estrangeira. O schema fica. */
+    /** Apaga pedidos, mensagens tratadas e outbox, na ordem da chave estrangeira. O schema fica. */
     static void limpar(JdbcTemplate jdbc) {
         jdbc.update("DELETE FROM outbox");
+        jdbc.update("DELETE FROM mensagens_processadas");
         jdbc.update("DELETE FROM item_pedido");
         jdbc.update("DELETE FROM pedido");
     }

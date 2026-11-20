@@ -3,6 +3,8 @@ package com.ruandiego.mini.pedido;
 import com.ruandiego.mini.pedido.application.port.out.BrokerMensagens;
 import com.ruandiego.mini.pedido.application.port.out.CalculadoraFrete;
 import com.ruandiego.mini.pedido.application.port.out.CatalogoConsulta;
+import com.ruandiego.mini.pedido.application.port.out.MensagensProcessadas;
+import com.ruandiego.mini.pedido.application.service.PagamentoEventosService;
 import com.ruandiego.mini.pedido.application.port.out.Outbox;
 import com.ruandiego.mini.pedido.application.port.out.PedidoRepository;
 import com.ruandiego.mini.pedido.application.port.out.PublicadorEventos;
@@ -41,6 +43,14 @@ class PedidoConfig {
     PedidoService pedidoService(PedidoRepository pedidos, CalculadoraFrete calculadoraFrete, CatalogoConsulta catalogo,
                                 PublicadorEventos publicador, Clock relogio, PlatformTransactionManager transacoes) {
         return transacional(new PedidoService(pedidos, calculadoraFrete, catalogo, publicador, relogio), transacoes);
+    }
+
+    /** Implementa ProcessarEventoDePagamento: o pedido reagindo ao pagamento aprovado e ao estornado. */
+    @Bean
+    PagamentoEventosService pagamentoEventosService(PedidoRepository pedidos, MensagensProcessadas processadas,
+                                                    PublicadorEventos publicador, Clock relogio,
+                                                    PlatformTransactionManager transacoes) {
+        return transacional(new PagamentoEventosService(pedidos, processadas, publicador, relogio), transacoes);
     }
 
     @Bean
