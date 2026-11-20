@@ -43,6 +43,14 @@ spring:
               filters:
                 - StripPrefix=2
 
+            # Pedidos e cotação de frete: exige token (SegurancaConfig). /api/pedidos/pedidos/meus → /pedidos/meus.
+            - id: pedido
+              uri: ${PEDIDO_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/pedidos/**
+              filters:
+                - StripPrefix=2
+
 management:
   endpoints:
     web:
