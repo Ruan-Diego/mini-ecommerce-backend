@@ -5,6 +5,8 @@ plugins {
 dependencies {
     implementation(project(":pedido-service:adapters"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // /actuator/prometheus: métricas HTTP, JVM e de negócio (mini_*) para o Prometheus.
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-web")
     // Resource server: valida o JWT do Keycloak; o sub do token é o dono do pedido.
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
@@ -17,6 +19,7 @@ dependencies {
     // Teste de integração do serviço inteiro contra MySQL e RabbitMQ em containers.
     // O teste confere o estado direto no MySQL e no RabbitMQ (os adapters guardam essas dependências para si).
     testImplementation("org.springframework.boot:spring-boot-starter-amqp")
+    testImplementation("io.opentelemetry:opentelemetry-api")
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")

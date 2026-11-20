@@ -57,4 +57,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  # Métricas para o Prometheus (/actuator/prometheus). O histograma do HTTP permite calcular p95 no Grafana.
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true

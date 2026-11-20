@@ -63,4 +63,20 @@ class TraceIdFilterTest {
 
         assertThat(MDC.get("traceId")).isNull();
     }
+
+    /** Com o Java agent há um span ativo: o id do log e da resposta é o trace id dele (o mesmo do Tempo). */
+    @Test
+    void comSpanDoOpenTelemetryUsaOTraceIdDele() throws Exception {
+        String trace = "4bf92f3577b34da6a3ce929d0e0e4736";
+        io.opentelemetry.api.trace.SpanContext contexto = io.opentelemetry.api.trace.SpanContext.create(trace,
+                "00f067aa0ba902b7", io.opentelemetry.api.trace.TraceFlags.getSampled(),
+                io.opentelemetry.api.trace.TraceState.getDefault());
+
+        try (var ignorado = io.opentelemetry.api.trace.Span.wrap(contexto).makeCurrent()) {
+            Resultado r = executar("outro-id");
+
+            assertThat(r.noMdcDuranteARequisicao()).isEqualTo(trace);
+            assertThat(r.resposta().getHeader("X-Trace-Id")).isEqualTo(trace);
+        }
+    }
 }

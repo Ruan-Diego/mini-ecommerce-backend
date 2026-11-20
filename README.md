@@ -47,7 +47,7 @@ docker compose -f infra/docker-compose.yml up -d --wait   # espera todos os heal
 O gateway também pode rodar em container, com healthcheck, apontando para os serviços no host:
 
 ```bash
-./gradlew :gateway:bootJar
+./gradlew :gateway:assemble   # jar + OpenTelemetry Java agent (a imagem leva os dois)
 docker compose -f infra/docker-compose.yml --profile apps up -d --build --wait gateway
 curl http://localhost:8080/api/catalogo/produtos   # o gateway tira o /api/catalogo e repassa para :8081
 ```
@@ -63,6 +63,25 @@ Swagger UI do catálogo: http://localhost:8081/swagger-ui/index.html
 | Usuário admin | realm `mini` | admin@mini.dev / admin |
 | MySQL | localhost:3306 | um usuário por schema: `catalogo`/`catalogo`, `carrinho`/`carrinho`, … |
 | Redis | localhost:6379 | — |
+
+### Observabilidade (traces, logs e métricas)
+
+```powershell
+docker compose -f infra/docker-compose.yml --profile observabilidade up -d
+```
+
+| Ferramenta | Endereço | Para quê |
+| --- | --- | --- |
+| Grafana | http://localhost:3000 | um dashboard por serviço (pasta "Mini E-commerce"), Explore com Tempo e Loki |
+| Prometheus | http://localhost:9090 | lê o `/actuator/prometheus` de cada serviço |
+| Tempo | http://localhost:3200 | traces |
+| Loki | http://localhost:3100 | logs com `trace_id` |
+| OTel Collector | localhost:4317 (gRPC) / 4318 (HTTP) | recebe traces e logs do agent e repassa ao Tempo e ao Loki |
+
+- O `bootRun` de cada serviço já sobe com o OpenTelemetry Java agent (`build/otel/opentelemetry-javaagent.jar`). Para rodar o jar direto, use `java -javaagent:<serviço>/bootstrap/build/otel/opentelemetry-javaagent.jar -jar ...`.
+- O `X-Trace-Id` da resposta é o trace id: cole no Explore do Grafana (Tempo) para ver o caminho inteiro. O trace atravessa a outbox e o RabbitMQ: o clique em "pagar" chega até a baixa no estoque.
+- Métricas de negócio: `mini_eventos_publicados_total{tipo}` (pedidos criados, pagamentos aprovados e recusados...) e `mini_reservas_expiradas_total`.
+- Os dashboards saem de `infra/observabilidade/grafana/gerar-dashboards.mjs`. Mudou o gerador? Rode `node infra/observabilidade/grafana/gerar-dashboards.mjs` e reinicie o Grafana.
 
 Para conferir que o usuário de um serviço não lê o schema de outro (ADR-0003), com a infra no ar:
 

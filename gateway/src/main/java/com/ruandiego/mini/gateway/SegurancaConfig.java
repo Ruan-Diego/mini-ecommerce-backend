@@ -40,7 +40,7 @@ class SegurancaConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable) // API sem cookie de sessão: não há o que forjar
                 .authorizeExchange(regras -> regras
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                        .pathMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                        .pathMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .pathMatchers("/api/*/admin/**").hasRole("admin")
                         // Webhook do gateway de pagamento: quem chama não é um cliente logado. O pagamento-service
                         // confere o segredo compartilhado (X-Webhook-Segredo) e responde 401 sem ele.

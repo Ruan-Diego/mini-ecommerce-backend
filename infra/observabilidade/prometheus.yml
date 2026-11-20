@@ -1,0 +1,21 @@
+# Prometheus lê as métricas do Actuator de cada serviço (Micrometer). Os serviços rodam no host durante o
+# desenvolvimento (bootRun) e o gateway pode estar no host ou no container: host.docker.internal alcança os dois.
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: mini
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+        labels: { servico: gateway }
+      - targets: ["host.docker.internal:8081"]
+        labels: { servico: catalogo-service }
+      - targets: ["host.docker.internal:8082"]
+        labels: { servico: carrinho-service }
+      - targets: ["host.docker.internal:8083"]
+        labels: { servico: pedido-service }
+      - targets: ["host.docker.internal:8084"]
+        labels: { servico: pagamento-service }
+      - targets: ["host.docker.internal:8085"]
+        labels: { servico: estoque-service }
