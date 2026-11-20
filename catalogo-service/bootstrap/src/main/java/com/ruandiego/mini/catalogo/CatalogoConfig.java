@@ -1,10 +1,13 @@
 package com.ruandiego.mini.catalogo;
 
+import com.ruandiego.mini.catalogo.application.port.out.BrokerMensagens;
 import com.ruandiego.mini.catalogo.application.port.out.CategoriaRepository;
+import com.ruandiego.mini.catalogo.application.port.out.Outbox;
 import com.ruandiego.mini.catalogo.application.port.out.ProdutoRepository;
 import com.ruandiego.mini.catalogo.application.port.out.PublicadorEventos;
 import com.ruandiego.mini.catalogo.application.service.AdministracaoProdutosService;
 import com.ruandiego.mini.catalogo.application.service.ConsultaCatalogoService;
+import com.ruandiego.mini.catalogo.application.service.RelayDoOutbox;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,6 +47,16 @@ class CatalogoConfig {
                                                        PlatformTransactionManager transacoes) {
         return transacional(new AdministracaoProdutosService(produtos, categorias, publicador, relogio),
                 transacoes, false);
+    }
+
+    /**
+     * Relay da outbox: lê o que já foi commitado, publica no RabbitMQ e dá baixa mensagem a mensagem (cada baixa é
+     * uma transação curta no adapter). Não é transacional como um todo, para não segurar o banco durante a rede.
+     * É ele que leva `PrecoAlterado` ao carrinho: antes só havia um log provisório.
+     */
+    @Bean
+    RelayDoOutbox relayDoOutbox(Outbox outbox, BrokerMensagens broker, Clock relogio) {
+        return new RelayDoOutbox(outbox, broker, relogio);
     }
 
     /**

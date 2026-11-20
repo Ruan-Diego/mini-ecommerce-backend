@@ -30,6 +30,9 @@ class OutboxJpa {
     @Column(name = "criada_em", nullable = false, columnDefinition = "datetime(6)", updatable = false)
     private Instant criadaEm;
 
+    @Column(name = "trace_id", length = 64, updatable = false)
+    private String traceId;
+
     @Column(name = "publicada_em", columnDefinition = "datetime(6)")
     private Instant publicadaEm;
 
@@ -37,7 +40,8 @@ class OutboxJpa {
         // exigido pelo JPA
     }
 
-    OutboxJpa(String id, String tipo, String payload, Instant criadaEm) {
+    OutboxJpa(String id, String tipo, String payload, Instant criadaEm, String traceId) {
+        this.traceId = traceId;
         this.id = id;
         this.tipo = tipo;
         this.payload = payload;
@@ -62,6 +66,10 @@ class OutboxJpa {
 
     Instant getCriadaEm() {
         return criadaEm;
+    }
+
+    String getTraceId() {
+        return traceId;
     }
 
     Instant getPublicadaEm() {

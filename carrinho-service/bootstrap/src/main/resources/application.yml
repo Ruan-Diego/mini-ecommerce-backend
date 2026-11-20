@@ -19,6 +19,17 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # 3 tentativas com espera crescente (1 s, 2 s). Esgotadas, a mensagem é rejeitada sem voltar à fila e o
+        # broker a manda para a DLQ (a fila tem x-dead-letter-exchange, veja RabbitConfig).
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 10s
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -31,6 +42,10 @@ carrinho:
   # API do catalogo-service, de onde vêm nome e preço dos produtos.
   catalogo:
     url: ${CATALOGO_URL:http://localhost:8081}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-}]"
 
 management:
   endpoints:

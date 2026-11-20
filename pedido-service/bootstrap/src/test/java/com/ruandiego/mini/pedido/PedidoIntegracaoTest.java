@@ -1,7 +1,9 @@
 package com.ruandiego.mini.pedido;
 
 import com.ruandiego.mini.pedido.adapters.out.persistencia.OutboxJpaAdapter;
+import com.ruandiego.mini.pedido.application.port.in.ProcessarEventoDePagamentoUseCase;
 import com.ruandiego.mini.pedido.application.port.out.PublicadorEventos;
+import com.ruandiego.mini.pedido.application.service.PagamentoEventosService;
 import com.ruandiego.mini.pedido.application.service.RelayDoOutbox;
 import com.ruandiego.mini.kernel.DomainEvent;
 import com.sun.net.httpserver.HttpServer;
@@ -10,6 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageBuilder;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -33,6 +37,13 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.Base64;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +55,7 @@ import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -55,7 +67,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * um catálogo falso. Prova pelo HTTP o critério de pronto da issue: nenhum evento chega ao broker antes do
  * commit do pedido. O relay agendado fica desligado e o teste o aciona à mão, para controlar o momento.
  */
-@SpringBootTest(properties = "pedido.outbox.relay-ligado=false")
+@SpringBootTest(properties = {
+        "pedido.outbox.relay-ligado=false",
+        "spring.rabbitmq.listener.simple.retry.initial-interval=100ms"})
 @AutoConfigureMockMvc
 @Import(PedidoIntegracaoTest.Infra.class)
 class PedidoIntegracaoTest {
@@ -86,6 +100,10 @@ class PedidoIntegracaoTest {
     private RelayDoOutbox relay;
     @Autowired
     private Infra.PublicadorDeTeste publicador;
+    @Autowired
+    private Infra.ContadorDeTentativas tentativas;
+    @Autowired
+    private RabbitMQContainer rabbitmq;
 
     @BeforeEach
     void limpar() {
@@ -93,6 +111,10 @@ class PedidoIntegracaoTest {
         jdbc.update("DELETE FROM item_pedido");
         jdbc.update("DELETE FROM pedido");
         rabbitAdmin.purgeQueue(FILA_DE_TESTE, false);
+        rabbitAdmin.purgeQueue("pedido.pagamento", false);
+        rabbitAdmin.purgeQueue("pedido.pagamento.dlq", false);
+        jdbc.update("DELETE FROM mensagens_processadas");
+        tentativas.zerar();
         publicador.falharDepoisDeGravar = false;
         publicador.espiarPorOutraConexao = false;
         publicador.publicadasPorOutraConexao = null;
@@ -226,8 +248,161 @@ class PedidoIntegracaoTest {
                 .andExpect(jsonPath("$.paths['/fretes/cotacao'].get").exists());
     }
 
+    // ---- consumo de eventos do pagamento: idempotência, retry e DLQ ----
+
+    private void enviarEventoDePagamento(String chave, String messageId, String clienteId, String valor, String traceId) {
+        String corpo = "{\"pagamentoId\":\"%s\",\"pedidoId\":\"%s\",\"clienteId\":\"%s\",\"valor\":%s,\"transacaoId\":\"tx-1\"}"
+                .formatted(UUID.randomUUID(), pedidoDoBanco(), clienteId, valor);
+        var construtor = MessageBuilder.withBody(corpo.getBytes(StandardCharsets.UTF_8))
+                .setContentType(MessageProperties.CONTENT_TYPE_JSON)
+                .setMessageId(messageId);
+        if (traceId != null) {
+            construtor.setHeader("x-trace-id", traceId);
+        }
+        rabbit.send("mini.events", chave, construtor.build());
+    }
+
+    private String pedidoDoBanco() {
+        return jdbc.queryForObject("SELECT id FROM pedido", String.class);
+    }
+
+    private String statusDoPedido() {
+        return jdbc.queryForObject("SELECT status FROM pedido", String.class);
+    }
+
+    @Test
+    void pagamentoAprovadoMarcaOPedidoComoPagoEAMesmaMensagemEntregueDeNovoNaoFazNada() throws Exception {
+        criar("ana");
+        String mensagem = UUID.randomUUID().toString();
+
+        enviarEventoDePagamento("pagamento.aprovado", mensagem, "ana", "219.90", null);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("PAGO"));
+
+        // O RabbitMQ entrega "pelo menos uma vez": a mesma mensagem de novo (mesmo messageId) não tem efeito.
+        enviarEventoDePagamento("pagamento.aprovado", mensagem, "ana", "219.90", null);
+        enviarEventoDePagamento("pagamento.aprovado", mensagem, "ana", "219.90", null);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(tentativas.total()).isEqualTo(3));
+
+        assertThat(statusDoPedido()).isEqualTo("PAGO");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM outbox WHERE tipo = 'pedido.pago'", Integer.class)).isEqualTo(1);
+        assertThat(contar("mensagens_processadas")).isEqualTo(1);
+        assertThat(rabbit.receive("pedido.pagamento.dlq")).isNull();
+    }
+
+    @Test
+    void pagamentoEstornadoCancelaOPedidoPago() throws Exception {
+        criar("ana");
+        enviarEventoDePagamento("pagamento.aprovado", UUID.randomUUID().toString(), "ana", "219.90", null);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("PAGO"));
+
+        enviarEventoDePagamento("pagamento.estornado", UUID.randomUUID().toString(), "ana", "219.90", null);
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("CANCELADO"));
+        assertThat(jdbc.queryForList("SELECT tipo FROM outbox ORDER BY seq", String.class))
+                .containsExactly("pedido.criado", "pedido.pago", "pedido.cancelado");
+    }
+
+    @Test
+    void mensagemQueFalhaTresVezesVaiParaADlqEApareceNoPainelDoRabbitMq() throws Exception {
+        criar("ana");
+        // O valor (R$ 1,00) não confere com o total do pedido: o use case recusa em toda tentativa.
+        enviarEventoDePagamento("pagamento.aprovado", UUID.randomUUID().toString(), "ana", "1.00", null);
+
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(tentativas.total()).isEqualTo(3));
+        Message morta = rabbit.receive("pedido.pagamento.dlq", 10_000);
+        assertThat(morta).isNotNull();
+        assertThat(new String(morta.getBody(), StandardCharsets.UTF_8)).contains(pedidoDoBanco());
+        // O broker registra de onde a mensagem morreu (cabeçalho x-death).
+        assertThat(morta.getMessageProperties().getHeaders()).containsKey("x-death");
+
+        // Nada mudou no pedido, e depois das 3 tentativas ninguém tenta mais.
+        assertThat(statusDoPedido()).isEqualTo("AGUARDANDO_PAGAMENTO");
+        assertThat(contar("mensagens_processadas")).isZero();
+        Thread.sleep(1_500);
+        assertThat(tentativas.total()).isEqualTo(3);
+    }
+
+    @Test
+    void aDlqApareceNaApiDeGerenciamentoDoRabbitMq() throws Exception {
+        criar("ana");
+        enviarEventoDePagamento("pagamento.aprovado", UUID.randomUUID().toString(), "ana", "1.00", null);
+
+        // É a mesma API que alimenta o painel (http://localhost:15672). As estatísticas dela atualizam a cada ~5 s.
+        HttpClient http = HttpClient.newHttpClient();
+        HttpRequest requisicao = HttpRequest.newBuilder(URI.create(rabbitmq.getHttpUrl() + "/api/queues/%2F/pedido.pagamento.dlq"))
+                .header("Authorization", "Basic " + Base64.getEncoder().encodeToString("guest:guest".getBytes(StandardCharsets.UTF_8)))
+                .build();
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            String corpo = http.send(requisicao, HttpResponse.BodyHandlers.ofString()).body();
+            assertThat(corpo).contains("\"name\":\"pedido.pagamento.dlq\"").containsPattern("\"messages\":1[,}]");
+        });
+    }
+
+    // ---- trace id ----
+
+    @Test
+    void oTraceIdDaRequisicaoChegaNaOutboxENaMensagemPublicada() throws Exception {
+        mvc.perform(como("ana", post("/pedidos")).header("X-Trace-Id", "trace-abc.123")
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo("padrao")))
+                .andExpect(status().isCreated())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("X-Trace-Id", "trace-abc.123"));
+
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM outbox", String.class)).isEqualTo("trace-abc.123");
+        relay.publicarPendentes(10);
+        Message mensagem = rabbit.receive(FILA_DE_TESTE, 5_000);
+        assertThat(mensagem).isNotNull();
+        assertThat(mensagem.getMessageProperties().getHeader("x-trace-id").toString()).isEqualTo("trace-abc.123");
+        assertThat(mensagem.getMessageProperties().getMessageId())
+                .isEqualTo(jdbc.queryForObject("SELECT id FROM outbox", String.class));
+    }
+
+    @Test
+    void semCabecalhoOServicoGeraUmTraceIdENaoGravaNulo() throws Exception {
+        criar("ana");
+
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM outbox", String.class)).matches("[0-9a-f]{32}");
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     static class Infra {
+
+        /** Conta quantas vezes o listener chamou o use case (cada tentativa do retry conta uma). */
+        static class ContadorDeTentativas implements ProcessarEventoDePagamentoUseCase {
+            private final ProcessarEventoDePagamentoUseCase real;
+            private final AtomicInteger chamadas = new AtomicInteger();
+
+            ContadorDeTentativas(ProcessarEventoDePagamentoUseCase real) {
+                this.real = real;
+            }
+
+            int total() {
+                return chamadas.get();
+            }
+
+            void zerar() {
+                chamadas.set(0);
+            }
+
+            @Override
+            public void aprovado(PagamentoAprovado evento) {
+                chamadas.incrementAndGet();
+                real.aprovado(evento);
+            }
+
+            @Override
+            public void estornado(PagamentoEstornado evento) {
+                chamadas.incrementAndGet();
+                real.estornado(evento);
+            }
+        }
+
+        @Bean
+        @Primary
+        ContadorDeTentativas contadorDeTentativas(PagamentoEventosService real) {
+            return new ContadorDeTentativas(real);
+        }
+
 
         @Bean
         @ServiceConnection
@@ -250,7 +425,7 @@ class PedidoIntegracaoTest {
 
         @Bean
         Binding ligacaoDaFilaDeTeste() {
-            return new Binding(FILA_DE_TESTE, Binding.DestinationType.QUEUE, "pedido.eventos", "pedido.#", null);
+            return new Binding(FILA_DE_TESTE, Binding.DestinationType.QUEUE, "mini.events", "pedido.#", null);
         }
 
         /**

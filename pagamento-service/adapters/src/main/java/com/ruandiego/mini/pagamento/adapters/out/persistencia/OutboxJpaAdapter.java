@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ruandiego.mini.kernel.DomainEvent;
 import com.ruandiego.mini.pagamento.application.port.out.Outbox;
 import com.ruandiego.mini.pagamento.application.port.out.PublicadorEventos;
+import org.slf4j.MDC;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -36,7 +37,7 @@ public class OutboxJpaAdapter implements PublicadorEventos, Outbox {
         for (DomainEvent evento : eventos) {
             try {
                 jpa.save(new OutboxJpa(UUID.randomUUID().toString(), evento.tipo(), json.writeValueAsString(evento),
-                        evento.ocorridoEm()));
+                        evento.ocorridoEm(), MDC.get("traceId")));
             } catch (JsonProcessingException e) {
                 // Se não dá para serializar, desfaz o use case inteiro: evento perdido em silêncio é pior que erro.
                 throw new IllegalStateException("não foi possível serializar o evento " + evento.tipo(), e);
@@ -48,7 +49,7 @@ public class OutboxJpaAdapter implements PublicadorEventos, Outbox {
     @Transactional(readOnly = true)
     public List<Mensagem> pendentes(int limite) {
         return jpa.findByPublicadaEmIsNullOrderBySeqAsc(PageRequest.of(0, limite)).stream()
-                .map(o -> new Mensagem(UUID.fromString(o.getId()), o.getTipo(), o.getPayload(), o.getCriadaEm()))
+                .map(o -> new Mensagem(UUID.fromString(o.getId()), o.getTipo(), o.getPayload(), o.getCriadaEm(), o.getTraceId()))
                 .toList();
     }
 

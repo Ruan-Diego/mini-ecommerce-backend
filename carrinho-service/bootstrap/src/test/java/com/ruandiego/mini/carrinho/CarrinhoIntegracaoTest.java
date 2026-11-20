@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * com um catálogo falso. O Flyway cria o schema, o Hibernate valida as entidades e o critério de pronto
  * da issue é provado pelo HTTP: itens adicionados como visitante continuam no carrinho depois do login.
  */
-@SpringBootTest
+@SpringBootTest(properties = "spring.rabbitmq.listener.simple.retry.initial-interval=100ms")
 @AutoConfigureMockMvc
 @Import(CarrinhoIntegracaoTest.Infra.class)
 class CarrinhoIntegracaoTest {
@@ -150,16 +150,22 @@ class CarrinhoIntegracaoTest {
     }
 
     @Test
-    void mensagemMalformadaNaoTravaAFila() throws Exception {
+    void mensagemMalformadaNaoTravaAFilaEVaiParaADlqDepoisDeTresTentativas() throws Exception {
         String cliente = "cliente-" + UUID.randomUUID();
         adicionar("X-Cliente-Id", cliente, PRODUTO_ID);
 
-        rabbit.send("catalogo.eventos", "catalogo.preco-alterado", json("{\"produtoId\":\"lixo\",\"precoNovo\":1}"));
+        rabbit.send("mini.events", "catalogo.preco-alterado", json("{\"produtoId\":\"lixo\",\"precoNovo\":1}"));
         publicar(PRODUTO_ID, "150.00", "2026-11-19T13:00:00Z");
 
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() ->
                 mvc.perform(get("/carrinhos/atual").header("X-Cliente-Id", cliente))
                         .andExpect(jsonPath("$.itens[0].precoUnitario").value(150.00)));
+
+        // A malformada foi tentada 3 vezes (retry) e o broker a entregou na fila morta, à vista no painel do RabbitMQ.
+        Message morta = rabbit.receive("carrinho.preco-alterado.dlq", 10_000);
+        assertThat(morta).isNotNull();
+        assertThat(new String(morta.getBody(), StandardCharsets.UTF_8)).contains("lixo");
+        assertThat(morta.getMessageProperties().getHeaders()).containsKey("x-death");
     }
 
     private void adicionar(String header, String identificacao, String produtoId) throws Exception {
@@ -170,7 +176,7 @@ class CarrinhoIntegracaoTest {
     }
 
     private void publicar(String produtoId, String precoNovo, String ocorridoEm) {
-        rabbit.send("catalogo.eventos", "catalogo.preco-alterado", json("{\"produtoId\":\"" + produtoId
+        rabbit.send("mini.events", "catalogo.preco-alterado", json("{\"produtoId\":\"" + produtoId
                 + "\",\"sku\":\"ESF-01\",\"precoAnterior\":100.00,\"precoNovo\":" + precoNovo
                 + ",\"ocorridoEm\":\"" + ocorridoEm + "\",\"campoNovoQueOCarrinhoIgnora\":true}"));
     }

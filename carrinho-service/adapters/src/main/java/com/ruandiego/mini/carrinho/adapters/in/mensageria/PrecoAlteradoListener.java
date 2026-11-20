@@ -6,8 +6,10 @@ import com.ruandiego.mini.carrinho.domain.model.ProdutoId;
 import com.ruandiego.mini.kernel.Dinheiro;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.time.DateTimeException;
@@ -34,7 +36,18 @@ class PrecoAlteradoListener {
     }
 
     @RabbitListener(queues = RabbitConfig.FILA_PRECO_ALTERADO)
-    void aoReceber(PrecoAlteradoMensagem mensagem) {
+    void aoReceber(PrecoAlteradoMensagem mensagem, @Header(name = "x-trace-id", required = false) String traceId) {
+        if (traceId != null) {
+            MDC.put("traceId", traceId);
+        }
+        try {
+            processar(mensagem);
+        } finally {
+            MDC.remove("traceId");
+        }
+    }
+
+    private void processar(PrecoAlteradoMensagem mensagem) {
         ProdutoId produtoId;
         Dinheiro precoNovo;
         Instant ocorridoEm;

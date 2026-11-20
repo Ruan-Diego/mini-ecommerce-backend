@@ -332,7 +332,7 @@ class PagamentoIntegracaoTest {
 
         @Bean
         Binding ligacaoDaFilaDeTeste() {
-            return new Binding(FILA_DE_TESTE, Binding.DestinationType.QUEUE, "pagamento.eventos", "pagamento.#", null);
+            return new Binding(FILA_DE_TESTE, Binding.DestinationType.QUEUE, "mini.events", "pagamento.#", null);
         }
 
         /**

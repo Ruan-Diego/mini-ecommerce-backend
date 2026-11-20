@@ -5,17 +5,18 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Topologia que o pedido precisa: a exchange de eventos do pedido (topic, durável). As filas ficam com
- * quem consome (pagamento, estoque, notificações), que as declaram e ligam pelas chaves `pedido.*`.
- * Declarar é idempotente: o RabbitMQ só cria o que ainda não existe. Retry e DLQ são do item 34.
+ * Declara a exchange única de eventos do projeto, `mini.events` (topic, durável). Todo serviço publica
+ * nela, com a routing key igual ao tipo do evento (`catalogo.preco-alterado`, `pedido.criado`,
+ * `pagamento.aprovado`...). Cada consumidor tem a sua fila (e a sua fila morta), declaradas por ele.
+ * Declarar é idempotente: o RabbitMQ só cria o que ainda não existe.
  */
 @Configuration(proxyBeanMethods = false)
 class RabbitConfig {
 
-    static final String EXCHANGE_PEDIDOS = "pedido.eventos";
+    static final String EXCHANGE_EVENTOS = "mini.events";
 
     @Bean
-    TopicExchange exchangePedidos() {
-        return new TopicExchange(EXCHANGE_PEDIDOS, true, false);
+    TopicExchange exchangeEventos() {
+        return new TopicExchange(EXCHANGE_EVENTOS, true, false);
     }
 }

@@ -4,11 +4,12 @@ import com.ruandiego.mini.pagamento.application.port.out.BrokerMensagens;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /** Broker de teste: guarda o que recebeu e pode ser ligado para falhar (broker fora do ar). */
 public class BrokerMensagensEmMemoria implements BrokerMensagens {
 
-    public record Publicada(String tipo, String payload) {
+    public record Publicada(UUID id, String tipo, String payload, String traceId) {
     }
 
     private final List<Publicada> recebidas = new ArrayList<>();
@@ -19,11 +20,11 @@ public class BrokerMensagensEmMemoria implements BrokerMensagens {
     }
 
     @Override
-    public void publicar(String tipo, String payload) {
+    public void publicar(UUID id, String tipo, String payload, String traceId) {
         if (foraDoAr) {
             throw new IllegalStateException("broker fora do ar");
         }
-        recebidas.add(new Publicada(tipo, payload));
+        recebidas.add(new Publicada(id, tipo, payload, traceId));
     }
 
     public List<Publicada> recebidas() {

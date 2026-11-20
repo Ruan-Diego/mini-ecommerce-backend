@@ -32,7 +32,7 @@ public class RelayDoOutbox {
         int publicadas = 0;
         for (Outbox.Mensagem mensagem : outbox.pendentes(limite)) {
             try {
-                broker.publicar(mensagem.tipo(), mensagem.payload());
+                broker.publicar(mensagem.id(), mensagem.tipo(), mensagem.payload(), mensagem.traceId());
             } catch (RuntimeException e) {
                 return publicadas;
             }

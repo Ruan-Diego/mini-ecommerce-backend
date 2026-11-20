@@ -23,7 +23,7 @@ public class OutboxEmMemoria implements PublicadorEventos, Outbox {
     @Override
     public void publicar(List<? extends DomainEvent> eventos) {
         for (DomainEvent evento : eventos) {
-            linhas.add(new Linha(new Mensagem(UUID.randomUUID(), evento.tipo(), evento.toString(), evento.ocorridoEm()), null));
+            linhas.add(new Linha(new Mensagem(UUID.randomUUID(), evento.tipo(), evento.toString(), evento.ocorridoEm(), null), null));
         }
     }
 

@@ -1,7 +1,9 @@
 package com.ruandiego.mini.pedido.application.memoria;
 
+import com.ruandiego.mini.pedido.application.contrato.MensagensProcessadasContrato;
 import com.ruandiego.mini.pedido.application.contrato.OutboxContrato;
 import com.ruandiego.mini.pedido.application.contrato.PedidoRepositoryContrato;
+import com.ruandiego.mini.pedido.application.port.out.MensagensProcessadas;
 import com.ruandiego.mini.pedido.application.port.out.Outbox;
 import com.ruandiego.mini.pedido.application.port.out.PedidoRepository;
 import com.ruandiego.mini.pedido.application.port.out.PublicadorEventos;
@@ -29,6 +31,15 @@ class EmMemoriaPassaNosContratosTest {
         @Override
         protected Outbox outbox() {
             return outbox;
+        }
+    }
+
+    static class Processadas extends MensagensProcessadasContrato {
+        private final MensagensProcessadasEmMemoria registro = new MensagensProcessadasEmMemoria();
+
+        @Override
+        protected MensagensProcessadas processadas() {
+            return registro;
         }
     }
 }

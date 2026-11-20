@@ -13,5 +13,5 @@ import java.util.List;
  */
 public interface PublicadorEventos {
 
-    void publicar(List<DomainEvent> eventos);
+    void publicar(List<? extends DomainEvent> eventos);
 }
