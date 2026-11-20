@@ -13,6 +13,8 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")
+    // Retry do frete (FreteComFallback). Só o módulo de retry, sem o starter do Spring.
+    implementation("io.github.resilience4j:resilience4j-retry:2.2.0")
     // Relay da outbox: publica os eventos no RabbitMQ.
     implementation("org.springframework.boot:spring-boot-starter-amqp")
 

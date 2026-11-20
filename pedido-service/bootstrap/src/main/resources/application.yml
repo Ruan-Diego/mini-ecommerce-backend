@@ -39,6 +39,22 @@ spring:
           issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/mini}
           jwk-set-uri: ${KEYCLOAK_JWKS:http://localhost:8180/realms/mini/protocol/openid-connect/certs}
 
+frete:
+  # Qual adapter do port CalculadoraFrete vale: fixo (padrão, sem rede) ou melhorenvio.
+  # A troca é só esta propriedade: domain e application não mudam.
+  provedor: ${FRETE_PROVEDOR:fixo}
+  melhorenvio:
+    # Só lidas com provedor=melhorenvio. Token do sandbox do Melhor Envio (nunca o de produção).
+    url: ${MELHORENVIO_URL:https://sandbox.melhorenvio.com.br}
+    token: ${MELHORENVIO_TOKEN:}
+    cep-origem: ${MELHORENVIO_CEP_ORIGEM:}
+    user-agent: ${MELHORENVIO_USER_AGENT:Mini Ecommerce (contato@exemplo.com)}
+    # Timeout do cliente HTTP e retry; esgotadas as tentativas, cai no frete fixo.
+    timeout-conexao-ms: 2000
+    timeout-leitura-ms: 3000
+    tentativas: 3
+    espera-entre-tentativas-ms: 300
+
 pedido:
   # API do catalogo-service, de onde vêm nome e preço dos produtos.
   catalogo:
