@@ -42,6 +42,10 @@ class SegurancaConfig {
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .pathMatchers("/api/*/admin/**").hasRole("admin")
+                        // Webhook do gateway de pagamento: quem chama não é um cliente logado. O pagamento-service
+                        // confere o segredo compartilhado (X-Webhook-Segredo) e responde 401 sem ele.
+                        .pathMatchers(HttpMethod.POST, "/api/pagamentos/webhooks/**").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/pagamentos/pagamentos/*/estorno").hasRole("admin")
                         .pathMatchers(HttpMethod.GET, "/api/catalogo/**").permitAll()
                         .pathMatchers("/api/carrinho/**").permitAll()
                         .anyExchange().authenticated())

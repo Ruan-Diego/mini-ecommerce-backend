@@ -48,6 +48,7 @@ class GatewaySegurancaTest {
         registro.add("CATALOGO_URL", () -> "http://localhost:" + SERVICO.getAddress().getPort());
         registro.add("CARRINHO_URL", () -> "http://localhost:" + SERVICO.getAddress().getPort());
         registro.add("PEDIDO_URL", () -> "http://localhost:" + SERVICO.getAddress().getPort());
+        registro.add("PAGAMENTO_URL", () -> "http://localhost:" + SERVICO.getAddress().getPort());
     }
 
     @AfterAll
@@ -94,6 +95,30 @@ class GatewaySegurancaTest {
                 .exchange().expectStatus().isOk();
         cliente.get().uri("/api/pedidos/fretes/cotacao?cep=01310100&subtotal=100")
                 .exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void pagamentosExigemTokenMasOWebhookDoGatewayNao() {
+        cliente.post().uri("/api/pagamentos/pagamentos").exchange().expectStatus().isUnauthorized();
+        cliente.post().uri("/api/pagamentos/pagamentos")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CHAVE, List.of("cliente"), 300))
+                .exchange().expectStatus().isOk();
+        // O webhook passa sem JWT (o segredo é conferido pelo pagamento-service, que aqui é um falso).
+        cliente.post().uri("/api/pagamentos/webhooks/gateway").exchange().expectStatus().isOk();
+        // Só o POST do webhook é livre.
+        cliente.get().uri("/api/pagamentos/webhooks/gateway").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
+    void estornoEhSoDoAdmin() {
+        String uri = "/api/pagamentos/pagamentos/abc/estorno";
+        cliente.post().uri(uri).exchange().expectStatus().isUnauthorized();
+        cliente.post().uri(uri)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CHAVE, List.of("cliente"), 300))
+                .exchange().expectStatus().isForbidden();
+        cliente.post().uri(uri)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token(CHAVE, List.of("cliente", "admin"), 300))
+                .exchange().expectStatus().isOk();
     }
 
     @Test
