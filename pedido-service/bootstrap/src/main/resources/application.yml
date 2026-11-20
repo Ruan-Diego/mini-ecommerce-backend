@@ -47,6 +47,10 @@ pedido:
     # Intervalo entre rodadas do relay, em milissegundos.
     intervalo: 1000
     relay-ligado: true
+  expiracao:
+    # Intervalo entre rodadas do job que cancela os pedidos sem pagamento há 30 minutos, em milissegundos.
+    intervalo: 60000
+    ligada: true
 
 logging:
   pattern:

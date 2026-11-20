@@ -69,6 +69,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = {
         "pedido.outbox.relay-ligado=false",
+        "pedido.expiracao.ligada=false",
         "spring.rabbitmq.listener.simple.retry.initial-interval=100ms"})
 @AutoConfigureMockMvc
 @Import(PedidoIntegracaoTest.Infra.class)
@@ -104,6 +105,14 @@ class PedidoIntegracaoTest {
     private Infra.ContadorDeTentativas tentativas;
     @Autowired
     private RabbitMQContainer rabbitmq;
+    @Autowired
+    private ExpiracaoAgendador expiracao;
+    @Autowired
+    private net.javacrumbs.shedlock.core.LockingTaskExecutor travador;
+    @Autowired
+    private com.ruandiego.mini.pedido.application.port.out.PedidoRepository repositorio;
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transacoes;
 
     @BeforeEach
     void limpar() {
@@ -116,6 +125,8 @@ class PedidoIntegracaoTest {
         rabbitAdmin.purgeQueue("pedido.estoque", false);
         rabbitAdmin.purgeQueue("pedido.estoque.dlq", false);
         jdbc.update("DELETE FROM mensagens_processadas");
+        // Libera o lock em vez de apagar a linha: o ShedLock lembra que ela existe e não a recria.
+        jdbc.update("UPDATE shedlock SET lock_until = '2000-01-01 00:00:00'");
         tentativas.zerar();
         publicador.falharDepoisDeGravar = false;
         publicador.espiarPorOutraConexao = false;
@@ -302,6 +313,86 @@ class PedidoIntegracaoTest {
         await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("CANCELADO"));
         assertThat(jdbc.queryForList("SELECT tipo FROM outbox ORDER BY seq", String.class))
                 .containsExactly("pedido.criado", "pedido.pago", "pedido.cancelado");
+    }
+
+    // ---- expiração: pedido sem pagamento em 30 minutos vira CANCELADO ----
+
+    /** Recua a criação do pedido no banco, no lugar de esperar 30 minutos de verdade. */
+    private void envelhecerPedido(long minutos) {
+        jdbc.update("UPDATE pedido SET criado_em = DATE_SUB(criado_em, INTERVAL ? MINUTE)", minutos);
+    }
+
+    @Test
+    void pedidoSemPagamentoHa30MinutosViraCanceladoEPublicaPedidoCancelado() throws Exception {
+        criar("ana");
+        envelhecerPedido(31);
+
+        assertThat(expiracao.executar()).isEqualTo(1);
+
+        assertThat(statusDoPedido()).isEqualTo("CANCELADO");
+        assertThat(jdbc.queryForList("SELECT tipo FROM outbox ORDER BY seq", String.class))
+                .containsExactly("pedido.criado", "pedido.cancelado");
+        // O evento chega ao broker pelo relay, como qualquer outro: é ele que faz o estoque devolver a reserva.
+        assertThat(relay.publicarPendentes(10)).isEqualTo(2);
+        assertThat(expiracao.executar()).isZero(); // rodar de novo não cancela nem publica de novo
+    }
+
+    @Test
+    void pedidoRecenteOuJaPagoNaoExpira() throws Exception {
+        criar("ana");
+        envelhecerPedido(20);
+        assertThat(expiracao.executar()).isZero();
+        assertThat(statusDoPedido()).isEqualTo("AGUARDANDO_PAGAMENTO");
+
+        enviarEventoDePagamento("pagamento.aprovado", UUID.randomUUID().toString(), "ana", "219.90", null);
+        await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertThat(statusDoPedido()).isEqualTo("PAGO"));
+        envelhecerPedido(120);
+
+        assertThat(expiracao.executar()).isZero();
+        assertThat(statusDoPedido()).isEqualTo("PAGO");
+    }
+
+    @Test
+    void comOLockTomadoPorOutraInstanciaARodadaPulaEDepoisFunciona() throws Exception {
+        criar("ana");
+        envelhecerPedido(31);
+
+        // Simula a outra instância como ela existe de verdade: uma linha no banco com o lock tomado por outro host
+        // pelos próximos minutos. (Não dá para simular na mesma JVM: o ShedLock aceita o mesmo lock aninhado na
+        // mesma thread.)
+        jdbc.update("""
+                INSERT INTO shedlock (name, lock_until, locked_at, locked_by)
+                VALUES (?, DATE_ADD(NOW(3), INTERVAL 5 MINUTE), NOW(3), 'outra-instancia')
+                ON DUPLICATE KEY UPDATE lock_until = VALUES(lock_until), locked_by = VALUES(locked_by)""",
+                ExpiracaoAgendador.NOME_DO_LOCK);
+
+        assertThat(expiracao.executar()).isZero();
+        assertThat(statusDoPedido()).isEqualTo("AGUARDANDO_PAGAMENTO");
+
+        jdbc.update("UPDATE shedlock SET lock_until = '2000-01-01 00:00:00'"); // a outra instância terminou
+        assertThat(expiracao.executar()).isEqualTo(1); // lock solto: agora roda
+        assertThat(statusDoPedido()).isEqualTo("CANCELADO");
+    }
+
+    @Test
+    void pagamentoAprovadoNoMeioDaExpiracaoFazAGravacaoFalharEOPedidoContinuaPago() throws Exception {
+        criar("ana");
+        envelhecerPedido(31);
+        var transacao = new org.springframework.transaction.support.TransactionTemplate(transacoes);
+
+        // Dentro de UMA transação (como no use case): lê o pedido; outro processo o marca como PAGO e muda a
+        // versão; a gravação do cancelamento tem de falhar em vez de sobrescrever o pagamento.
+        assertThatThrownBy(() -> transacao.executeWithoutResult(status -> {
+            var pedido = repositorio.listarAguardandoPagamentoCriadosAte(java.time.Instant.now(), 10).get(0);
+            // Em OUTRA thread, para não entrar na transação desta (o JdbcTemplate usa a conexão da thread): é
+            // o consumidor do pagamento, que grava e confirma por conta própria.
+            java.util.concurrent.CompletableFuture.runAsync(
+                    () -> jdbc.update("UPDATE pedido SET status = 'PAGO', versao = versao + 1")).join();
+            pedido.cancelar(java.time.Instant.now());
+            repositorio.salvar(pedido);
+        })).isInstanceOf(org.springframework.dao.OptimisticLockingFailureException.class);
+
+        assertThat(statusDoPedido()).isEqualTo("PAGO");
     }
 
     // ---- compensação da saga: estoque indisponível cancela o pedido ----
