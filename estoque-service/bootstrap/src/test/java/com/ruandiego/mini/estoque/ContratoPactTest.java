@@ -72,6 +72,12 @@ class ContratoPactTest {
                 PRODUTO);
     }
 
+    @State("o produto 55555555-5555-4555-8555-555555555555 não tem estoque cadastrado")
+    void produtoSemEstoqueCadastrado() {
+        jdbc.update("DELETE FROM outbox");
+        jdbc.update("DELETE FROM item_estoque");
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     static class Infra {
 
