@@ -215,6 +215,133 @@
       }
     },
     {
+      "description": "o ajuste de entrada de 5 unidades",
+      "providerStates": [
+        {
+          "name": "o produto 11111111-1111-4111-8111-111111111111 tem 3 unidades disponíveis no estoque"
+        }
+      ],
+      "request": {
+        "body": {
+          "quantidade": 5,
+          "tipo": "ENTRADA"
+        },
+        "headers": {
+          "Accept": "application/json",
+          "Authorization": "Bearer token-pact-admin",
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/estoque/admin/estoque/11111111-1111-4111-8111-111111111111/ajustes"
+      },
+      "response": {
+        "body": {
+          "disponivel": 8,
+          "emEstoque": true,
+          "estoqueBaixo": false,
+          "produtoId": "11111111-1111-4111-8111-111111111111",
+          "reservado": 0
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.produtoId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.reservado": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application\\/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "o ajuste de perda maior que o disponível",
+      "providerStates": [
+        {
+          "name": "o produto 11111111-1111-4111-8111-111111111111 tem 3 unidades disponíveis no estoque"
+        }
+      ],
+      "request": {
+        "body": {
+          "quantidade": 10,
+          "tipo": "PERDA"
+        },
+        "headers": {
+          "Accept": "application/json",
+          "Authorization": "Bearer token-pact-admin",
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/estoque/admin/estoque/11111111-1111-4111-8111-111111111111/ajustes"
+      },
+      "response": {
+        "body": {
+          "detail": "a perda de 10 é maior que o disponível (3)"
+        },
+        "headers": {
+          "Content-Type": "application/problem+json"
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.detail": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application\\/(problem\\+)?json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 422
+      }
+    },
+    {
       "description": "o ajuste do saldo disponível para 20",
       "providerStates": [
         {
