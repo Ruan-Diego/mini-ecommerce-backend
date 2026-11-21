@@ -5,7 +5,11 @@ import com.ruandiego.mini.pedido.domain.model.ClienteId;
 import com.ruandiego.mini.pedido.domain.model.Pedido;
 import com.ruandiego.mini.pedido.domain.model.PedidoId;
 import com.ruandiego.mini.pedido.domain.model.StatusPedido;
+import com.ruandiego.mini.pedido.application.Pagina;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -44,5 +48,35 @@ public class PedidoRepositoryJpa implements PedidoRepository {
     public List<Pedido> listarAguardandoPagamentoCriadosAte(Instant criadosAte, int quantidade) {
         return jpa.findByStatusAndCriadoEmLessThanEqualOrderByCriadoEmAsc(StatusPedido.AGUARDANDO_PAGAMENTO, criadosAte,
                 PageRequest.of(0, quantidade)).stream().map(PedidoMapper::paraDominio).toList();
+    }
+
+    @Override
+    public Pagina<Pedido> buscar(Criterios criterios, int pagina, int tamanho) {
+        Page<PedidoJpa> resultado = jpa.findAll(especificacao(criterios),
+                PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm").and(Sort.by("id"))));
+        return new Pagina<>(resultado.getContent().stream().map(PedidoMapper::paraDominio).toList(), pagina, tamanho,
+                resultado.getTotalElements());
+    }
+
+    @Override
+    public long contar(Criterios criterios) {
+        return jpa.count(especificacao(criterios));
+    }
+
+    /** Monta o WHERE só com os filtros informados. O id no desempate deixa a paginação estável. */
+    private static Specification<PedidoJpa> especificacao(Criterios criterios) {
+        return (raiz, consulta, cb) -> {
+            var condicoes = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            if (!criterios.status().isEmpty()) {
+                condicoes.add(raiz.get("status").in(criterios.status()));
+            }
+            if (criterios.criadosDesde() != null) {
+                condicoes.add(cb.greaterThanOrEqualTo(raiz.get("criadoEm"), criterios.criadosDesde()));
+            }
+            if (criterios.criadosAntes() != null) {
+                condicoes.add(cb.lessThan(raiz.get("criadoEm"), criterios.criadosAntes()));
+            }
+            return cb.and(condicoes.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
     }
 }

@@ -5,7 +5,9 @@ import com.ruandiego.mini.catalogo.application.port.out.CategoriaRepository;
 import com.ruandiego.mini.catalogo.application.port.out.Outbox;
 import com.ruandiego.mini.catalogo.application.port.out.ProdutoRepository;
 import com.ruandiego.mini.catalogo.application.port.out.PublicadorEventos;
+import com.ruandiego.mini.catalogo.application.port.out.ArmazenamentoImagens;
 import com.ruandiego.mini.catalogo.application.service.AdministracaoProdutosService;
+import com.ruandiego.mini.catalogo.application.service.ImagensProdutoService;
 import com.ruandiego.mini.catalogo.application.service.ConsultaCatalogoService;
 import com.ruandiego.mini.catalogo.application.service.RelayDoOutbox;
 import org.springframework.aop.framework.ProxyFactory;
@@ -47,6 +49,13 @@ class CatalogoConfig {
                                                        PlatformTransactionManager transacoes) {
         return transacional(new AdministracaoProdutosService(produtos, categorias, publicador, relogio),
                 transacoes, false);
+    }
+
+    /** Implementa AdicionarImagem (upload). Transacional: a imagem entra na galeria junto com o salvamento. */
+    @Bean
+    ImagensProdutoService imagensProduto(ProdutoRepository produtos, ArmazenamentoImagens armazenamento,
+                                         PlatformTransactionManager transacoes) {
+        return transacional(new ImagensProdutoService(produtos, armazenamento), transacoes, false);
     }
 
     /**

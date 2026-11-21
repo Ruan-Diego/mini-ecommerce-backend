@@ -31,7 +31,12 @@ class TratadorDeErros extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ConflitoException.class)
     ProblemDetail conflito(ConflitoException e) {
-        return problema(HttpStatus.CONFLICT, "Conflito", e.getMessage());
+        ProblemDetail problema = problema(HttpStatus.CONFLICT, "Conflito", e.getMessage());
+        if (e.campo() != null) {
+            // Extensão do problem+json: a tela põe a mensagem no campo certo (ex.: "sku").
+            problema.setProperty("campo", e.campo());
+        }
+        return problema;
     }
 
     @ExceptionHandler(RequisicaoInvalidaException.class)

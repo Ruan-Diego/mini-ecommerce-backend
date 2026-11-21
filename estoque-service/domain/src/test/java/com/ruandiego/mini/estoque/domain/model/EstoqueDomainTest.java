@@ -20,6 +20,14 @@ class EstoqueDomainTest {
     // --- ItemEstoque ---
 
     @Test
+    void estoqueBaixoEhDisponivelAbaixoDeCincoIgnorandoOReservado() {
+        assertThat(ItemEstoque.reconstituir(A, 4, 0).estoqueBaixo()).isTrue();
+        assertThat(ItemEstoque.reconstituir(A, 0, 0).estoqueBaixo()).isTrue();
+        assertThat(ItemEstoque.reconstituir(A, 5, 0).estoqueBaixo()).isFalse();
+        assertThat(ItemEstoque.reconstituir(A, 4, 50).estoqueBaixo()).isTrue();
+    }
+
+    @Test
     void reservarMoveDoDisponivelParaOReservado() {
         ItemEstoque item = ItemEstoque.novo(A, 10);
 
@@ -184,5 +192,27 @@ class EstoqueDomainTest {
                 T0, T0.plusSeconds(1800), T0);
 
         assertThat(reserva.eventosPendentes()).isEmpty();
+    }
+
+    @Test
+    void entradaSomaEPerdaSubtraiSemMexerNoReservado() {
+        ItemEstoque item = ItemEstoque.reconstituir(A, 6, 2);
+
+        item.entrada(4);
+        assertThat(item.disponivel()).isEqualTo(10);
+        item.perda(3);
+        assertThat(item.disponivel()).isEqualTo(7);
+        assertThat(item.reservado()).isEqualTo(2);
+    }
+
+    @Test
+    void perdaNaoPassaDoDisponivelEQuantidadeTemDeSerPositiva() {
+        ItemEstoque item = ItemEstoque.reconstituir(A, 3, 5);
+
+        assertThatThrownBy(() -> item.perda(4)).isInstanceOf(RegraDeNegocioException.class);
+        assertThatThrownBy(() -> item.perda(0)).isInstanceOf(RegraDeNegocioException.class);
+        assertThatThrownBy(() -> item.entrada(0)).isInstanceOf(RegraDeNegocioException.class);
+        assertThatThrownBy(() -> item.entrada(-2)).isInstanceOf(RegraDeNegocioException.class);
+        assertThat(item.disponivel()).isEqualTo(3);
     }
 }

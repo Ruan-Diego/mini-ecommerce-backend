@@ -1,5 +1,9 @@
 package com.ruandiego.mini.pedido;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import com.ruandiego.mini.pedido.application.port.in.ExpirarPedidosSemPagamentoUseCase;
 import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
 import net.javacrumbs.shedlock.core.LockConfiguration;
@@ -43,12 +47,17 @@ class ExpiracaoAgendador {
     private final ExpirarPedidosSemPagamentoUseCase expirar;
     private final LockingTaskExecutor travador;
     private final boolean ligado;
+    private final Counter expiradas;
 
     ExpiracaoAgendador(ExpirarPedidosSemPagamentoUseCase expirar, LockingTaskExecutor travador,
-                       @Value("${pedido.expiracao.ligada:true}") boolean ligado) {
+                       @Value("${pedido.expiracao.ligada:true}") boolean ligado, ObjectProvider<MeterRegistry> metricas) {
         this.expirar = expirar;
         this.travador = travador;
         this.ligado = ligado;
+        // Cada pedido cancelado por falta de pagamento devolve a reserva ao estoque: é a "reserva expirada".
+        this.expiradas = Counter.builder("mini.reservas.expiradas")
+                .description("Pedidos cancelados pelo job por falta de pagamento (reserva devolvida ao estoque)")
+                .register(metricas.getIfAvailable(SimpleMeterRegistry::new));
     }
 
     @Bean
@@ -84,6 +93,7 @@ class ExpiracaoAgendador {
                     new LockConfiguration(Instant.now(), NOME_DO_LOCK, MAXIMO_COM_O_LOCK, Duration.ZERO));
             if (cancelados.get() > 0) {
                 log.info("expiração: {} pedido(s) sem pagamento cancelado(s)", cancelados.get());
+                expiradas.increment(cancelados.get());
             }
         } catch (RuntimeException e) {
             // Banco fora do ar, ou o pagamento aprovado chegou no meio (conflito de versão): a próxima rodada tenta de novo.

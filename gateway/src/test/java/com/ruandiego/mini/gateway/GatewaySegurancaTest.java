@@ -86,6 +86,30 @@ class GatewaySegurancaTest {
                 .exchange().expectStatus().isForbidden();
     }
 
+    /** Rotas /admin do item 49: nenhuma passa sem token, nenhuma passa com token de cliente (inclusive os GETs). */
+    @Test
+    void rotasDoPainelAdminExigemOPapel() {
+        String cliente = "Bearer " + token(CHAVE, List.of("cliente"), 300);
+        List<org.springframework.http.HttpMethod> metodos = List.of(org.springframework.http.HttpMethod.GET,
+                org.springframework.http.HttpMethod.GET, org.springframework.http.HttpMethod.GET,
+                org.springframework.http.HttpMethod.PATCH, org.springframework.http.HttpMethod.GET,
+                org.springframework.http.HttpMethod.POST);
+        List<String> rotas = List.of("/api/pedidos/admin/indicadores", "/api/pedidos/admin/pedidos?status=PAGO",
+                "/api/estoque/admin/indicadores", "/api/pedidos/admin/pedidos/1/status",
+                "/api/estoque/admin/estoque?abaixoDe=5", "/api/catalogo/admin/produtos/1/imagens");
+        for (int i = 0; i < rotas.size(); i++) {
+            this.cliente.method(metodos.get(i)).uri(rotas.get(i)).exchange().expectStatus().isUnauthorized();
+            this.cliente.method(metodos.get(i)).uri(rotas.get(i)).header(HttpHeaders.AUTHORIZATION, cliente)
+                    .exchange().expectStatus().isForbidden();
+        }
+    }
+
+    /** As imagens do upload são públicas: a vitrine as mostra para quem não está logado. */
+    @Test
+    void imagensDoCatalogoSaoPublicas() {
+        cliente.get().uri("/api/catalogo/imagens/qualquer.png").exchange().expectStatus().isOk();
+    }
+
     @Test
     void rotaProtegidaQueNaoEAdminExigeSoOToken() {
         cliente.get().uri("/api/pedidos/pedidos/meus").exchange().expectStatus().isUnauthorized();

@@ -3,7 +3,9 @@ package com.ruandiego.mini.catalogo.adapters.in.web;
 import com.ruandiego.mini.catalogo.application.memoria.CategoriaRepositoryEmMemoria;
 import com.ruandiego.mini.catalogo.application.memoria.ProdutoRepositoryEmMemoria;
 import com.ruandiego.mini.catalogo.application.memoria.PublicadorEventosEmMemoria;
+import com.ruandiego.mini.catalogo.application.memoria.ArmazenamentoImagensEmMemoria;
 import com.ruandiego.mini.catalogo.application.service.AdministracaoProdutosService;
+import com.ruandiego.mini.catalogo.application.service.ImagensProdutoService;
 import com.ruandiego.mini.catalogo.application.service.ConsultaCatalogoService;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -45,5 +47,15 @@ class CatalogoEmMemoria {
                                                PublicadorEventosEmMemoria publicador) {
         return new AdministracaoProdutosService(produtos, categorias, publicador,
                 Clock.fixed(Instant.parse("2026-11-19T12:00:00Z"), ZoneOffset.UTC));
+    }
+
+    @Bean
+    ArmazenamentoImagensEmMemoria armazenamento() {
+        return new ArmazenamentoImagensEmMemoria();
+    }
+
+    @Bean
+    ImagensProdutoService imagensProduto(ProdutoRepositoryEmMemoria produtos, ArmazenamentoImagensEmMemoria armazenamento) {
+        return new ImagensProdutoService(produtos, armazenamento);
     }
 }

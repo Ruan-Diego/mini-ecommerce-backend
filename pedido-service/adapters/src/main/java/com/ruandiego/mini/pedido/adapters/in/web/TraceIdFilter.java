@@ -1,5 +1,7 @@
 package com.ruandiego.mini.pedido.adapters.in.web;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,6 +21,9 @@ import java.util.regex.Pattern;
  * formato estranho, guarda no MDC (`traceId`, que entra em todo log da requisição) e devolve na resposta.
  * Quem grava eventos na outbox lê o MDC e o repassa na mensagem, ligando o log de quem publica ao de quem consome.
  * O formato é restrito para um cabeçalho malicioso não injetar linhas falsas no log.
+ *
+ * Com o OpenTelemetry Java agent, a requisição já chega com um span ativo (o trace veio do gateway pelo
+ * `traceparent`): aí o trace id é o dele, e o `X-Trace-Id` da resposta é o mesmo id que se procura no Tempo.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -32,7 +37,9 @@ class TraceIdFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String recebido = request.getHeader(CABECALHO);
-        String traceId = recebido != null && FORMATO_VALIDO.matcher(recebido).matches()
+        SpanContext span = Span.current().getSpanContext();
+        String traceId = span.isValid() ? span.getTraceId()
+                : recebido != null && FORMATO_VALIDO.matcher(recebido).matches()
                 ? recebido
                 : UUID.randomUUID().toString().replace("-", "");
         MDC.put(CHAVE_MDC, traceId);

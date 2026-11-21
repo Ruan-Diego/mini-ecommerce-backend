@@ -6,6 +6,7 @@ import com.ruandiego.mini.catalogo.application.memoria.CategoriaRepositoryEmMemo
 import com.ruandiego.mini.catalogo.application.memoria.ProdutoRepositoryEmMemoria;
 import com.ruandiego.mini.catalogo.application.port.in.BuscarProdutosUseCase.Filtro;
 import com.ruandiego.mini.catalogo.application.port.in.BuscarProdutosUseCase.Ordem;
+import com.ruandiego.mini.catalogo.application.port.in.ListarProdutosAdminUseCase;
 import com.ruandiego.mini.catalogo.domain.RegraDeNegocioException;
 import com.ruandiego.mini.catalogo.domain.model.Categoria;
 import com.ruandiego.mini.catalogo.domain.model.CategoriaId;
@@ -47,6 +48,41 @@ class ConsultaCatalogoServiceTest {
         produto("ANL-IRIS", "Anel Íris", "219.00", aneis.id(), true);
         produto("BLC-INK", "Bloco Ink", "149.00", blocos.id(), true);
         produto("ANL-CLAY", "Anel Clay", "99.00", aneis.id(), false); // inativo
+    }
+
+    @Nested
+    class ListarParaAdmin {
+
+        @Test
+        void trazTambemOsDesativadosEmOrdemAlfabetica() {
+            Pagina<Produto> pagina = service.listarParaAdmin(new ListarProdutosAdminUseCase.Filtro(null, null, null));
+
+            assertThat(nomes(pagina)).containsExactly("Anel Clay", "Anel Íris", "Bloco Ink", "Esfera Chrome", "Esfera Lime");
+            assertThat(pagina.itens()).filteredOn(p -> !p.ativo()).extracting(Produto::nome).containsExactly("Anel Clay");
+        }
+
+        @Test
+        void buscaPeloSku() {
+            Pagina<Produto> pagina = service.listarParaAdmin(new ListarProdutosAdminUseCase.Filtro("anl-", null, null));
+
+            assertThat(nomes(pagina)).containsExactly("Anel Clay", "Anel Íris");
+        }
+
+        @Test
+        void paginaComOTamanhoPedido() {
+            Pagina<Produto> segunda = service.listarParaAdmin(new ListarProdutosAdminUseCase.Filtro(null, 1, 2));
+
+            assertThat(nomes(segunda)).containsExactly("Bloco Ink", "Esfera Chrome");
+            assertThat(segunda.total()).isEqualTo(5);
+        }
+
+        @Test
+        void tamanhoForaDoLimiteEhRecusado() {
+            assertThatThrownBy(() -> new ListarProdutosAdminUseCase.Filtro(null, 0, 101))
+                    .isInstanceOf(RegraDeNegocioException.class);
+            assertThatThrownBy(() -> new ListarProdutosAdminUseCase.Filtro(null, -1, 10))
+                    .isInstanceOf(RegraDeNegocioException.class);
+        }
     }
 
     @Nested

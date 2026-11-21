@@ -4,9 +4,12 @@ import com.ruandiego.mini.estoque.application.port.in.AjustarEstoqueUseCase;
 import com.ruandiego.mini.estoque.application.port.in.ConsultarEstoqueUseCase;
 import com.ruandiego.mini.estoque.domain.model.ItemEstoque;
 import com.ruandiego.mini.estoque.domain.model.ProdutoId;
+import com.ruandiego.mini.estoque.domain.model.TipoDeAjuste;
 import jakarta.validation.Valid;
+import java.util.Locale;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,6 +38,21 @@ class EstoqueController {
     EstoqueResposta definir(@PathVariable String produtoId, @Valid @RequestBody AjusteRequisicao corpo) {
         ItemEstoque item = ajustar.definirDisponivel(produtoId(produtoId), corpo.disponivel());
         return EstoqueResposta.de(item);
+    }
+
+    /** Ajuste com motivo (entrada, perda ou correção): ver {@link AjustarEstoqueUseCase#ajustar}. */
+    @PostMapping("/admin/estoque/{produtoId}/ajustes")
+    EstoqueResposta ajustar(@PathVariable String produtoId, @Valid @RequestBody AjusteComMotivoRequisicao corpo) {
+        ItemEstoque item = ajustar.ajustar(produtoId(produtoId), tipo(corpo.tipo()), corpo.quantidade());
+        return EstoqueResposta.de(item);
+    }
+
+    private static TipoDeAjuste tipo(String texto) {
+        try {
+            return TipoDeAjuste.valueOf(texto.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new RequisicaoInvalidaException("tipo de ajuste desconhecido: " + texto + " (use ENTRADA, PERDA ou CORRECAO)");
+        }
     }
 
     private static ProdutoId produtoId(String texto) {

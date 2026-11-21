@@ -47,6 +47,18 @@ public class ItemEstoqueRepositoryJpa implements ItemEstoqueRepository {
         jpa.save(linha);
     }
 
+    @Override
+    public List<ItemEstoque> listarComDisponivelAbaixoDe(Integer limite) {
+        List<ItemEstoqueJpa> linhas = limite == null ? jpa.findAllByOrderByDisponivelAscProdutoIdAsc()
+                : jpa.findByDisponivelLessThanOrderByDisponivelAscProdutoIdAsc(limite);
+        return linhas.stream().map(ItemEstoqueRepositoryJpa::paraDominio).toList();
+    }
+
+    @Override
+    public long contarComDisponivelAbaixoDe(int limite) {
+        return jpa.countByDisponivelLessThan(limite);
+    }
+
     private static ItemEstoque paraDominio(ItemEstoqueJpa linha) {
         return ItemEstoque.reconstituir(ProdutoId.de(linha.getProdutoId()), linha.getDisponivel(), linha.getReservado());
     }

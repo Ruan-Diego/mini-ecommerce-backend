@@ -14,5 +14,8 @@ tasks.bootJar {
 dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // Só a API: o trace id vem do span do OpenTelemetry Java agent quando ele está presente.
+    implementation("io.opentelemetry:opentelemetry-api")
 }

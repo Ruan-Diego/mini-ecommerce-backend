@@ -68,6 +68,10 @@ pedido:
     intervalo: 60000
     ligada: true
 
+loja:
+  # Fuso da loja: define o que é "hoje" nos indicadores do admin e as datas do filtro de pedidos.
+  fuso: ${LOJA_FUSO:America/Sao_Paulo}
+
 logging:
   pattern:
     level: "%5p [${spring.application.name:},%X{traceId:-}]"
@@ -76,4 +80,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  # Métricas para o Prometheus (/actuator/prometheus). O histograma do HTTP permite calcular p95 no Grafana.
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+mini:
+  eventos:
+    # Tipos de evento que este serviço publica: os contadores mini_eventos_publicados_total nascem com 0.
+    tipos: pedido.criado,pedido.pago,pedido.em-separacao,pedido.enviado,pedido.entregue,pedido.cancelado

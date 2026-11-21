@@ -2,18 +2,21 @@ package com.ruandiego.mini.estoque.application.service;
 
 import com.ruandiego.mini.estoque.application.NaoEncontradoException;
 import com.ruandiego.mini.estoque.application.port.in.AjustarEstoqueUseCase;
+import com.ruandiego.mini.estoque.application.port.in.ConsultarEstoqueAdminUseCase;
 import com.ruandiego.mini.estoque.application.port.in.ConsultarEstoqueUseCase;
 import com.ruandiego.mini.estoque.application.port.in.ProcessarEventoDePedidoUseCase;
 import com.ruandiego.mini.estoque.application.port.out.ItemEstoqueRepository;
 import com.ruandiego.mini.estoque.application.port.out.MensagensProcessadas;
 import com.ruandiego.mini.estoque.application.port.out.PublicadorEventos;
 import com.ruandiego.mini.estoque.application.port.out.ReservaRepository;
+import com.ruandiego.mini.estoque.domain.model.EstoqueAjustado;
 import com.ruandiego.mini.estoque.domain.model.ItemEstoque;
 import com.ruandiego.mini.estoque.domain.model.ItemReservado;
 import com.ruandiego.mini.estoque.domain.model.PedidoId;
 import com.ruandiego.mini.estoque.domain.model.ProdutoId;
 import com.ruandiego.mini.estoque.domain.model.Reserva;
 import com.ruandiego.mini.estoque.domain.model.StatusReserva;
+import com.ruandiego.mini.estoque.domain.model.TipoDeAjuste;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -32,7 +35,8 @@ import java.util.Map;
  * terminar e então lê o saldo já descontado. O domínio ainda confere antes de cada mudança, e o banco tem
  * CHECK (disponivel >= 0) como última barreira.
  */
-public class EstoqueService implements ProcessarEventoDePedidoUseCase, ConsultarEstoqueUseCase, AjustarEstoqueUseCase {
+public class EstoqueService implements ProcessarEventoDePedidoUseCase, ConsultarEstoqueUseCase, AjustarEstoqueUseCase,
+        ConsultarEstoqueAdminUseCase {
 
     /** Nome deste consumidor no registro de mensagens tratadas. */
     public static final String CONSUMIDOR = "estoque-service";
@@ -144,6 +148,22 @@ public class EstoqueService implements ProcessarEventoDePedidoUseCase, Consultar
         return item;
     }
 
+    @Override
+    public ItemEstoque ajustar(ProdutoId produto, TipoDeAjuste tipo, int quantidade) {
+        ItemEstoque item = itens.buscarComTrava(List.of(produto)).stream().findFirst()
+                .orElseGet(() -> ItemEstoque.novo(produto, 0));
+        int antes = item.disponivel();
+        switch (tipo) {
+            case ENTRADA -> item.entrada(quantidade);
+            case PERDA -> item.perda(quantidade);
+            case CORRECAO -> item.definirDisponivel(quantidade);
+        }
+        itens.salvar(item);
+        publicador.publicar(List.of(new EstoqueAjustado(produto.toString(), tipo.name(), quantidade, antes,
+                item.disponivel(), relogio.instant())));
+        return item;
+    }
+
     private Reserva reserva(PedidoId pedido) {
         return reservas.buscarPorPedidoComTrava(pedido)
                 .orElseThrow(() -> new NaoEncontradoException("reserva do pedido " + pedido + " não encontrada"));
@@ -160,5 +180,19 @@ public class EstoqueService implements ProcessarEventoDePedidoUseCase, Consultar
         reservas.salvar(reserva);
         publicador.publicar(reserva.eventosPendentes());
         reserva.limparEventos();
+    }
+
+    @Override
+    public List<ItemEstoque> listar(Integer abaixoDe) {
+        if (abaixoDe != null && abaixoDe < 1) {
+            throw new com.ruandiego.mini.estoque.domain.RegraDeNegocioException("o filtro 'abaixo de' deve ser 1 ou mais");
+        }
+        return itens.listarComDisponivelAbaixoDe(abaixoDe);
+    }
+
+    @Override
+    public Indicadores indicadores() {
+        return new Indicadores(itens.contarComDisponivelAbaixoDe(ItemEstoque.LIMITE_ESTOQUE_BAIXO),
+                ItemEstoque.LIMITE_ESTOQUE_BAIXO);
     }
 }

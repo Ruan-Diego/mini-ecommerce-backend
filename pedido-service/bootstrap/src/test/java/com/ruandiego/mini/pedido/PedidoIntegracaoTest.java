@@ -72,6 +72,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "pedido.expiracao.ligada=false",
         "spring.rabbitmq.listener.simple.retry.initial-interval=100ms"})
 @AutoConfigureMockMvc
+// Em teste o Spring Boot desliga a exportação de métricas; aqui ela fica ligada para provar o /actuator/prometheus.
+@org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability(tracing = false)
 @Import(PedidoIntegracaoTest.Infra.class)
 class PedidoIntegracaoTest {
 
@@ -512,6 +514,106 @@ class PedidoIntegracaoTest {
         criar("ana");
 
         assertThat(jdbc.queryForObject("SELECT trace_id FROM outbox", String.class)).matches("[0-9a-f]{32}");
+    }
+
+    // ---- admin ----
+
+    private static MockHttpServletRequestBuilder comoAdmin(MockHttpServletRequestBuilder req) {
+        return req.with(jwt().jwt(token -> token.subject("admin"))
+                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_admin")));
+    }
+
+    /** O serviço não confia só no gateway: toda rota /admin sem token é 401 e com token de cliente é 403. */
+    @Test
+    void rotasDoAdminExigemOPapelAdmin() throws Exception {
+        criar("ana");
+        String id = jdbc.queryForObject("SELECT id FROM pedido", String.class);
+        String corpoStatus = "{\"status\":\"CANCELADO\"}";
+
+        List<MockHttpServletRequestBuilder> rotas = List.of(
+                get("/admin/indicadores"),
+                get("/admin/pedidos"),
+                get("/admin/pedidos/" + id),
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/admin/pedidos/" + id + "/status")
+                        .contentType(MediaType.APPLICATION_JSON).content(corpoStatus));
+        for (MockHttpServletRequestBuilder rota : rotas) {
+            mvc.perform(rota).andExpect(status().isUnauthorized());
+            mvc.perform(como("ana", rota)).andExpect(status().isForbidden());
+        }
+        assertThat(jdbc.queryForObject("SELECT status FROM pedido", String.class)).isEqualTo("AGUARDANDO_PAGAMENTO");
+
+        mvc.perform(comoAdmin(get("/admin/indicadores"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.aguardandoPagamento").value(1));
+        mvc.perform(comoAdmin(get("/admin/pedidos"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens[0].clienteId").value("ana"));
+    }
+
+    /** Ponta a ponta no MySQL: o admin leva o pedido pago até enviado, e o rastreio e os eventos ficam gravados. */
+    @Test
+    void adminEnviaOPedidoPagoComRastreioNoMySql() throws Exception {
+        criar("ana");
+        String id = jdbc.queryForObject("SELECT id FROM pedido", String.class);
+        jdbc.update("UPDATE pedido SET status = 'EM_SEPARACAO'");
+        jdbc.update("DELETE FROM outbox");
+        var patch = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/admin/pedidos/" + id + "/status")
+                .contentType(MediaType.APPLICATION_JSON);
+
+        mvc.perform(comoAdmin(patch.content("{\"status\":\"ENVIADO\"}"))).andExpect(status().isUnprocessableEntity());
+        mvc.perform(comoAdmin(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/admin/pedidos/" + id + "/status").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"ENVIADO\",\"codigoRastreio\":\"BR123456789\"}")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transicoesPermitidas[0]").value("ENTREGUE"));
+
+        assertThat(jdbc.queryForObject("SELECT codigo_rastreio FROM pedido", String.class)).isEqualTo("BR123456789");
+        assertThat(jdbc.queryForList("SELECT tipo FROM outbox", String.class)).containsExactly("pedido.enviado");
+        // O cliente vê o rastreio no próprio pedido.
+        mvc.perform(como("ana", get("/pedidos/" + id))).andExpect(jsonPath("$.codigoRastreio").value("BR123456789"));
+    }
+
+    // ---- observabilidade ----
+
+    /**
+     * O trace atravessa a outbox: o pedido é criado dentro de um span (o que o Java agent faria na requisição) e o
+     * relay, depois e fora dele, publica a mensagem com o mesmo `traceparent`. O evento confirmado conta na
+     * métrica de negócio exposta ao Prometheus.
+     */
+    @Test
+    void traceDaRequisicaoChegaNaMensagemEOEventoContaNaMetrica() throws Exception {
+        String trace = "4bf92f3577b34da6a3ce929d0e0e4736";
+        String span = "00f067aa0ba902b7";
+        io.opentelemetry.api.trace.SpanContext contexto = io.opentelemetry.api.trace.SpanContext.create(trace, span,
+                io.opentelemetry.api.trace.TraceFlags.getSampled(), io.opentelemetry.api.trace.TraceState.getDefault());
+        double antes = contadorDeEventos("pedido.criado");
+        // Contador de tipo que ainda não aconteceu já existe (0) desde a subida: o Prometheus vê o "antes".
+        assertThat(metricas.find("mini.eventos.publicados").tag("tipo", "pedido.entregue").counter()).isNotNull();
+
+        try (var ignorado = io.opentelemetry.api.trace.Span.wrap(contexto).makeCurrent()) {
+            criar("ana");
+        }
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM outbox", String.class))
+                .isEqualTo("00-" + trace + "-" + span + "-01");
+
+        assertThat(relay.publicarPendentes(10)).isEqualTo(1);
+
+        Message mensagem = rabbit.receive(FILA_DE_TESTE, 5_000);
+        assertThat(mensagem).isNotNull();
+        assertThat((String) mensagem.getMessageProperties().getHeader("traceparent"))
+                .isEqualTo("00-" + trace + "-" + span + "-01");
+        assertThat((String) mensagem.getMessageProperties().getHeader("x-trace-id")).isEqualTo(trace);
+        assertThat(contadorDeEventos("pedido.criado")).isEqualTo(antes + 1);
+        mvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .string(org.hamcrest.Matchers.containsString("mini_eventos_publicados_total{")));
+    }
+
+    @Autowired
+    private io.micrometer.core.instrument.MeterRegistry metricas;
+
+    private double contadorDeEventos(String tipo) {
+        var contador = metricas.find("mini.eventos.publicados").tag("tipo", tipo).counter();
+        return contador == null ? 0 : contador.count();
     }
 
     @TestConfiguration(proxyBeanMethods = false)

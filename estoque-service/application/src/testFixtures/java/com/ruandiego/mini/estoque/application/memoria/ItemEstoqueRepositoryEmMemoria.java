@@ -37,6 +37,21 @@ public class ItemEstoqueRepositoryEmMemoria implements ItemEstoqueRepository {
         itens.put(item.produtoId(), copia(item));
     }
 
+    @Override
+    public List<ItemEstoque> listarComDisponivelAbaixoDe(Integer limite) {
+        return itens.values().stream()
+                .filter(item -> limite == null || item.disponivel() < limite)
+                .sorted(java.util.Comparator.comparingInt(ItemEstoque::disponivel)
+                        .thenComparing(item -> item.produtoId().toString()))
+                .map(ItemEstoqueRepositoryEmMemoria::copia)
+                .toList();
+    }
+
+    @Override
+    public long contarComDisponivelAbaixoDe(int limite) {
+        return itens.values().stream().filter(item -> item.disponivel() < limite).count();
+    }
+
     public void limpar() {
         itens.clear();
     }

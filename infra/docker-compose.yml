@@ -61,7 +61,7 @@ services:
       start_period: 30s
 
   # Perfil "apps": não sobe com a infra (docker compose up -d), só com --profile apps.
-  # Antes, gere o jar: .\gradlew.bat :gateway:bootJar
+  # Antes, gere o jar e o agent: .\gradlew.bat :gateway:assemble
   # Os serviços rodam no host (bootRun) durante o desenvolvimento; o gateway os alcança por host.docker.internal.
   gateway:
     profiles: [apps]
@@ -75,6 +75,8 @@ services:
       # O token vem do navegador com iss = localhost:8180; as chaves, o container busca no serviço do Compose.
       KEYCLOAK_ISSUER: http://localhost:${KEYCLOAK_PORT:-8180}/realms/mini
       KEYCLOAK_JWKS: http://keycloak:8080/realms/mini/protocol/openid-connect/certs
+      # Traces e logs do agent vão ao collector (perfil observabilidade), publicado na porta 4318 do host.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4318}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -87,5 +89,69 @@ services:
       retries: 10
       start_period: 20s
 
+  # ---- Perfil "observabilidade": docker compose -f infra/docker-compose.yml --profile observabilidade up -d ----
+  # Os serviços (bootRun, com o OpenTelemetry Java agent) mandam traces e logs ao collector em localhost:4318.
+  # Grafana em http://localhost:3000 (sem login), com Prometheus, Tempo e Loki já configurados.
+
+  otel-collector:
+    profiles: [observabilidade]
+    image: otel/opentelemetry-collector-contrib:0.164.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observabilidade/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on: [tempo, loki]
+
+  tempo:
+    profiles: [observabilidade]
+    image: grafana/tempo:2.10.9
+    command: ["-config.file=/etc/tempo.yaml"]
+    user: "0"
+    volumes:
+      - ./observabilidade/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"
+
+  loki:
+    profiles: [observabilidade]
+    image: grafana/loki:3.6.20
+    # A configuração padrão da imagem (local-config.yaml) já guarda no disco e aceita OTLP em /otlp.
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+
+  prometheus:
+    profiles: [observabilidade]
+    image: prom/prometheus:v3.15.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=3d"]
+    volumes:
+      - ./observabilidade/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9090:9090"
+
+  grafana:
+    profiles: [observabilidade]
+    image: grafana/grafana:12.4.15
+    environment:
+      # Ambiente local: entra direto como admin, sem tela de login.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+    volumes:
+      - ./observabilidade/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observabilidade/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus, tempo, loki]
+
 volumes:
   mysql-data:
+  tempo-data:
+  loki-data:

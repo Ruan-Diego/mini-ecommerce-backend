@@ -1,5 +1,7 @@
 package com.ruandiego.mini.gateway;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -15,6 +17,9 @@ import java.util.regex.Pattern;
  * Ponto de entrada do trace id: se a requisição chegou sem `X-Trace-Id` (ou com um valor de formato estranho),
  * o gateway gera um e o repassa para o serviço, e o devolve na resposta. Os serviços colocam o id no log e
  * nas mensagens que publicam, então uma compra pode ser seguida do navegador até o último consumidor.
+ *
+ * Com o OpenTelemetry Java agent, o gateway é o primeiro span do trace: o id devolvido é o trace id dele, e o
+ * agent repassa o contexto aos serviços pelo cabeçalho `traceparent`.
  */
 @Component
 class TraceIdFiltro implements GlobalFilter, Ordered {
@@ -25,7 +30,9 @@ class TraceIdFiltro implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String recebido = exchange.getRequest().getHeaders().getFirst(CABECALHO);
-        String traceId = recebido != null && FORMATO_VALIDO.matcher(recebido).matches()
+        SpanContext span = Span.current().getSpanContext();
+        String traceId = span.isValid() ? span.getTraceId()
+                : recebido != null && FORMATO_VALIDO.matcher(recebido).matches()
                 ? recebido
                 : UUID.randomUUID().toString().replace("-", "");
         ServerHttpRequest requisicao = exchange.getRequest().mutate().header(CABECALHO, traceId).build();
