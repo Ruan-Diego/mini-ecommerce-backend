@@ -55,6 +55,85 @@
       }
     },
     {
+      "description": "a lista de categorias",
+      "providerStates": [
+        {
+          "name": "existe a categoria esferas com o id 33333333-3333-4333-8333-333333333333"
+        }
+      ],
+      "request": {
+        "headers": {
+          "Accept": "application/json",
+          "Authorization": "Bearer token-pact-admin"
+        },
+        "method": "GET",
+        "path": "/catalogo/categorias"
+      },
+      "response": {
+        "body": [
+          {
+            "id": "33333333-3333-4333-8333-333333333333",
+            "nome": "Esferas",
+            "paiId": null,
+            "slug": "esferas"
+          }
+        ],
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$[*].nome": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$[*].slug": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application\\/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
       "description": "a lista de produtos do admin buscando por esf",
       "providerStates": [
         {
@@ -518,11 +597,11 @@
         }
       ],
       "request": {
-        "body": "LS1qQTg2NExpenlKdWJSam1LDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImFycXVpdm8iOyBmaWxlbmFtZT0icGl4ZWwucG5nIg0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg0KLS1qQTg2NExpenlKdWJSam1LLS0NCg==",
+        "body": "LS1MUnFDWTlOUFdLUm1jM0RODQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImFycXVpdm8iOyBmaWxlbmFtZT0icGl4ZWwucG5nIg0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg0KLS1MUnFDWTlOUFdLUm1jM0ROLS0NCg==",
         "headers": {
           "Accept": "application/json",
           "Authorization": "Bearer token-pact-admin",
-          "Content-Type": "multipart/form-data; boundary=jA864LizyJubRjmK"
+          "Content-Type": "multipart/form-data; boundary=LRqCY9NPWKRmc3DN"
         },
         "matchingRules": {
           "body": {
