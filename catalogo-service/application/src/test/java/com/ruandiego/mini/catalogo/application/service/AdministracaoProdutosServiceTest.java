@@ -68,7 +68,8 @@ class AdministracaoProdutosServiceTest {
 
             assertThatThrownBy(() -> service.cadastrar(mesmoSku))
                     .isInstanceOf(ConflitoException.class)
-                    .hasMessageContaining("SKU ESF-CHROME");
+                    .hasMessageContaining("SKU ESF-CHROME")
+                    .hasFieldOrPropertyWithValue("campo", "sku");
             assertThat(produtos.quantidade()).isEqualTo(1);
         }
 
@@ -80,7 +81,8 @@ class AdministracaoProdutosServiceTest {
 
             assertThatThrownBy(() -> service.cadastrar(mesmoNome))
                     .isInstanceOf(ConflitoException.class)
-                    .hasMessageContaining("slug esfera-chrome");
+                    .hasMessageContaining("slug esfera-chrome")
+                    .hasFieldOrPropertyWithValue("campo", "slug");
         }
 
         @Test

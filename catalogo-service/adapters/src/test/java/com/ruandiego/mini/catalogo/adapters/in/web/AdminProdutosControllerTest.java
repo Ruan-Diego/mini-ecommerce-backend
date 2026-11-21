@@ -22,6 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -69,13 +70,40 @@ class AdminProdutosControllerTest {
     }
 
     @Test
+    void listaTambemOsDesativadosEBuscaPeloSku() throws Exception {
+        cadastrar("ESF-CHROME", "Esfera Chrome", "289.00").andExpect(status().isCreated());
+        cadastrar("ESF-LIME", "Esfera Lime", "199.00").andExpect(status().isCreated());
+        Produto lime = produtos.buscarPorSlug(new Slug("esfera-lime")).orElseThrow();
+        mvc.perform(delete("/admin/produtos/{id}", lime.id())).andExpect(status().isNoContent());
+
+        mvc.perform(get("/admin/produtos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.itens[0].nome").value("Esfera Chrome"))
+                .andExpect(jsonPath("$.itens[0].ativo").value(true))
+                .andExpect(jsonPath("$.itens[1].nome").value("Esfera Lime"))
+                .andExpect(jsonPath("$.itens[1].ativo").value(false));
+
+        mvc.perform(get("/admin/produtos").param("busca", "esf-lime"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.itens[0].sku").value("ESF-LIME"));
+    }
+
+    @Test
+    void listaComTamanhoInvalidoEh422() throws Exception {
+        mvc.perform(get("/admin/produtos").param("tamanho", "0")).andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
     void skuRepetidoEh409() throws Exception {
         cadastrar("ESF-CHROME", "Esfera Chrome", "289.00").andExpect(status().isCreated());
 
         cadastrar("ESF-CHROME", "Outra Esfera", "100.00")
                 .andExpect(status().isConflict())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.title").value("Conflito"));
+                .andExpect(jsonPath("$.title").value("Conflito"))
+                .andExpect(jsonPath("$.campo").value("sku"));
     }
 
     @Test
