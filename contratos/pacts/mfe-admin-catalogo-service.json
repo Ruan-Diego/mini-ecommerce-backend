@@ -420,6 +420,289 @@
       }
     },
     {
+      "description": "a lista de produtos do admin em páginas de 100",
+      "providerStates": [
+        {
+          "name": "existem o produto ativo esfera-chrome (11111111-1111-4111-8111-111111111111) e o desativado esfera-lime"
+        }
+      ],
+      "request": {
+        "headers": {
+          "Accept": "application/json",
+          "Authorization": "Bearer token-pact-admin"
+        },
+        "method": "GET",
+        "path": "/catalogo/admin/produtos",
+        "query": {
+          "pagina": [
+            "0"
+          ],
+          "tamanho": [
+            "100"
+          ]
+        }
+      },
+      "response": {
+        "body": {
+          "itens": [
+            {
+              "ativo": true,
+              "categoriaId": "33333333-3333-4333-8333-333333333333",
+              "descricao": "Esfera de aço polido.",
+              "id": "11111111-1111-4111-8111-111111111111",
+              "imagens": [
+                {
+                  "textoAlternativo": "Esfera cromada",
+                  "url": "https://cdn.mini.dev/esfera.webp"
+                }
+              ],
+              "nome": "Esfera Chrome",
+              "preco": 289,
+              "sku": "ESF-CHROME-01",
+              "slug": "esfera-chrome"
+            },
+            {
+              "ativo": false,
+              "categoriaId": "33333333-3333-4333-8333-333333333333",
+              "descricao": "Esfera de aço polido.",
+              "id": "66666666-6666-4666-8666-666666666666",
+              "imagens": [
+                {
+                  "textoAlternativo": "Esfera cromada",
+                  "url": "https://cdn.mini.dev/esfera.webp"
+                }
+              ],
+              "nome": "Esfera Lime",
+              "preco": 289,
+              "sku": "ESF-LIME-01",
+              "slug": "esfera-lime"
+            }
+          ],
+          "pagina": 0,
+          "tamanho": 100,
+          "total": 2,
+          "totalPaginas": 1
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.itens[0].categoriaId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.itens[0].descricao": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[0].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.itens[0].imagens": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.itens[0].imagens[*].textoAlternativo": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[0].imagens[*].url": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[0].nome": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[0].preco": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.itens[0].sku": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[0].slug": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[1].categoriaId": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.itens[1].descricao": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[1].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            },
+            "$.itens[1].imagens": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.itens[1].imagens[*].textoAlternativo": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[1].imagens[*].url": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[1].nome": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[1].preco": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.itens[1].sku": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.itens[1].slug": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.pagina": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.tamanho": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.total": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.totalPaginas": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          },
+          "header": {
+            "Content-Type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "application\\/json.*"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
       "description": "o cadastro de um produto",
       "providerStates": [
         {
@@ -597,11 +880,11 @@
         }
       ],
       "request": {
-        "body": "LS1MUnFDWTlOUFdLUm1jM0RODQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImFycXVpdm8iOyBmaWxlbmFtZT0icGl4ZWwucG5nIg0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg0KLS1MUnFDWTlOUFdLUm1jM0ROLS0NCg==",
+        "body": "LS1RQlRkUFNrV1pOZXJXSlRBDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9ImFycXVpdm8iOyBmaWxlbmFtZT0icGl4ZWwucG5nIg0KQ29udGVudC1UeXBlOiBpbWFnZS9wbmcNCg0KiVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg0KLS1RQlRkUFNrV1pOZXJXSlRBLS0NCg==",
         "headers": {
           "Accept": "application/json",
           "Authorization": "Bearer token-pact-admin",
-          "Content-Type": "multipart/form-data; boundary=LRqCY9NPWKRmc3DN"
+          "Content-Type": "multipart/form-data; boundary=QBTdPSkWZNerWJTA"
         },
         "matchingRules": {
           "body": {
