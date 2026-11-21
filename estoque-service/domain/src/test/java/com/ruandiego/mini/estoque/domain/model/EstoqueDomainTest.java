@@ -193,4 +193,26 @@ class EstoqueDomainTest {
 
         assertThat(reserva.eventosPendentes()).isEmpty();
     }
+
+    @Test
+    void entradaSomaEPerdaSubtraiSemMexerNoReservado() {
+        ItemEstoque item = ItemEstoque.reconstituir(A, 6, 2);
+
+        item.entrada(4);
+        assertThat(item.disponivel()).isEqualTo(10);
+        item.perda(3);
+        assertThat(item.disponivel()).isEqualTo(7);
+        assertThat(item.reservado()).isEqualTo(2);
+    }
+
+    @Test
+    void perdaNaoPassaDoDisponivelEQuantidadeTemDeSerPositiva() {
+        ItemEstoque item = ItemEstoque.reconstituir(A, 3, 5);
+
+        assertThatThrownBy(() -> item.perda(4)).isInstanceOf(RegraDeNegocioException.class);
+        assertThatThrownBy(() -> item.perda(0)).isInstanceOf(RegraDeNegocioException.class);
+        assertThatThrownBy(() -> item.entrada(0)).isInstanceOf(RegraDeNegocioException.class);
+        assertThatThrownBy(() -> item.entrada(-2)).isInstanceOf(RegraDeNegocioException.class);
+        assertThat(item.disponivel()).isEqualTo(3);
+    }
 }

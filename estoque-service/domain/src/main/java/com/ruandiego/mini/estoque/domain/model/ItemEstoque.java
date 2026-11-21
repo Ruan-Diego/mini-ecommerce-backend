@@ -67,6 +67,21 @@ public class ItemEstoque {
         reservado -= quantidade;
     }
 
+    /** Ajuste do administrador: chegou mercadoria. Soma ao saldo vendável. */
+    public void entrada(int quantidade) {
+        exigirPositiva(quantidade);
+        disponivel = Math.addExact(disponivel, quantidade);
+    }
+
+    /** Ajuste do administrador: mercadoria perdida ou danificada. Só pode tirar o que ainda está disponível. */
+    public void perda(int quantidade) {
+        exigirPositiva(quantidade);
+        if (quantidade > disponivel) {
+            throw new RegraDeNegocioException("a perda de " + quantidade + " é maior que o disponível (" + disponivel + ")");
+        }
+        disponivel -= quantidade;
+    }
+
     /** Ajuste do administrador: define o saldo vendável. O que já está reservado não muda. */
     public void definirDisponivel(int novo) {
         if (novo < 0) {

@@ -15,6 +15,7 @@ import com.ruandiego.mini.estoque.domain.model.ItemReservado;
 import com.ruandiego.mini.estoque.domain.model.PedidoId;
 import com.ruandiego.mini.estoque.domain.model.ProdutoId;
 import com.ruandiego.mini.estoque.domain.model.StatusReserva;
+import com.ruandiego.mini.estoque.domain.model.TipoDeAjuste;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -251,5 +252,38 @@ class EstoqueServiceTest {
             assertThat(i.reservado()).isEqualTo(5);
         });
         assertThatThrownBy(() -> service.definirDisponivel(A, -1)).isInstanceOf(RegraDeNegocioException.class);
+    }
+
+    @Test
+    void ajusteComMotivoEntradaPerdaECorrecaoRegistraOAntesEODepois() {
+        itens.salvar(ItemEstoque.novo(A, 10));
+
+        service.ajustar(A, TipoDeAjuste.ENTRADA, 5);
+        service.ajustar(A, TipoDeAjuste.PERDA, 3);
+        service.ajustar(A, TipoDeAjuste.CORRECAO, 20);
+
+        assertThat(itens.buscar(A).orElseThrow().disponivel()).isEqualTo(20);
+        assertThat(tiposPublicados()).containsExactly("estoque.ajustado", "estoque.ajustado", "estoque.ajustado");
+        assertThat(outbox.pendentes(100)).extracting(Outbox.Mensagem::payload).satisfiesExactly(
+                p -> assertThat(p).contains("ajuste=ENTRADA", "disponivelAntes=10", "disponivelDepois=15"),
+                p -> assertThat(p).contains("ajuste=PERDA", "disponivelAntes=15", "disponivelDepois=12"),
+                p -> assertThat(p).contains("ajuste=CORRECAO", "disponivelAntes=12", "disponivelDepois=20"));
+    }
+
+    @Test
+    void entradaDeProdutoSemEstoqueCadastradoCriaOItem() {
+        service.ajustar(A, TipoDeAjuste.ENTRADA, 8);
+
+        assertThat(itens.buscar(A)).hasValueSatisfying(i -> assertThat(i.disponivel()).isEqualTo(8));
+    }
+
+    @Test
+    void perdaMaiorQueODisponivelEhRecusadaSemGravarNemPublicar() {
+        itens.salvar(ItemEstoque.novo(A, 2));
+
+        assertThatThrownBy(() -> service.ajustar(A, TipoDeAjuste.PERDA, 3)).isInstanceOf(RegraDeNegocioException.class);
+
+        assertThat(itens.buscar(A).orElseThrow().disponivel()).isEqualTo(2);
+        assertThat(tiposPublicados()).isEmpty();
     }
 }

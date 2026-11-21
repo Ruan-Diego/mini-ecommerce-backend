@@ -9,12 +9,14 @@ import com.ruandiego.mini.estoque.application.port.out.ItemEstoqueRepository;
 import com.ruandiego.mini.estoque.application.port.out.MensagensProcessadas;
 import com.ruandiego.mini.estoque.application.port.out.PublicadorEventos;
 import com.ruandiego.mini.estoque.application.port.out.ReservaRepository;
+import com.ruandiego.mini.estoque.domain.model.EstoqueAjustado;
 import com.ruandiego.mini.estoque.domain.model.ItemEstoque;
 import com.ruandiego.mini.estoque.domain.model.ItemReservado;
 import com.ruandiego.mini.estoque.domain.model.PedidoId;
 import com.ruandiego.mini.estoque.domain.model.ProdutoId;
 import com.ruandiego.mini.estoque.domain.model.Reserva;
 import com.ruandiego.mini.estoque.domain.model.StatusReserva;
+import com.ruandiego.mini.estoque.domain.model.TipoDeAjuste;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -143,6 +145,22 @@ public class EstoqueService implements ProcessarEventoDePedidoUseCase, Consultar
                 .orElseGet(() -> ItemEstoque.novo(produto, 0));
         item.definirDisponivel(disponivel);
         itens.salvar(item);
+        return item;
+    }
+
+    @Override
+    public ItemEstoque ajustar(ProdutoId produto, TipoDeAjuste tipo, int quantidade) {
+        ItemEstoque item = itens.buscarComTrava(List.of(produto)).stream().findFirst()
+                .orElseGet(() -> ItemEstoque.novo(produto, 0));
+        int antes = item.disponivel();
+        switch (tipo) {
+            case ENTRADA -> item.entrada(quantidade);
+            case PERDA -> item.perda(quantidade);
+            case CORRECAO -> item.definirDisponivel(quantidade);
+        }
+        itens.salvar(item);
+        publicador.publicar(List.of(new EstoqueAjustado(produto.toString(), tipo.name(), quantidade, antes,
+                item.disponivel(), relogio.instant())));
         return item;
     }
 
