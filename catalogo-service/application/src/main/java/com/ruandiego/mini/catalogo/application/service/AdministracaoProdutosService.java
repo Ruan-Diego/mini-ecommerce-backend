@@ -49,10 +49,10 @@ public class AdministracaoProdutosService
 
         // Unicidade depende de outros produtos: só o repositório sabe.
         if (produtos.existeComSku(produto.sku())) {
-            throw new ConflitoException("já existe produto com o SKU " + produto.sku());
+            throw new ConflitoException("sku", "já existe produto com o SKU " + produto.sku());
         }
         if (produtos.existeComSlug(produto.slug())) {
-            throw new ConflitoException("já existe produto com o slug " + produto.slug());
+            throw new ConflitoException("slug", "já existe produto com o slug " + produto.slug());
         }
 
         salvarEPublicar(produto);

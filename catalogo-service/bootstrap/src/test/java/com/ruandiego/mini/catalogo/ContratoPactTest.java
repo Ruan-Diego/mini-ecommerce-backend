@@ -118,6 +118,15 @@ class ContratoPactTest {
                 List.of(new Imagem("https://cdn.mini.dev/esfera.webp", "Esfera cromada")), CATEGORIA, true));
     }
 
+    @State("existem o produto ativo esfera-chrome (11111111-1111-4111-8111-111111111111) e o desativado esfera-lime")
+    void produtoAtivoEProdutoDesativado() {
+        produtoComIdFixo();
+        produtos.salvar(Produto.reconstituir(ProdutoId.de("66666666-6666-4666-8666-666666666666"),
+                new Sku("ESF-LIME-01"), "Esfera Lime", new Slug("esfera-lime"), "Esfera de vidro lima.",
+                Dinheiro.de("199.00"), List.of(new Imagem("https://cdn.mini.dev/lime.webp", "Esfera lima")),
+                CATEGORIA, false));
+    }
+
     @State("existe a categoria esferas com o id 33333333-3333-4333-8333-333333333333")
     void categoriaComIdFixo() {
         limpar();

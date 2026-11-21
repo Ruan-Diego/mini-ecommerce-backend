@@ -4,6 +4,7 @@ import com.ruandiego.mini.catalogo.application.NaoEncontradoException;
 import com.ruandiego.mini.catalogo.application.Pagina;
 import com.ruandiego.mini.catalogo.application.port.in.BuscarProdutosUseCase;
 import com.ruandiego.mini.catalogo.application.port.in.ListarCategoriasUseCase;
+import com.ruandiego.mini.catalogo.application.port.in.ListarProdutosAdminUseCase;
 import com.ruandiego.mini.catalogo.application.port.in.ObterProdutoUseCase;
 import com.ruandiego.mini.catalogo.application.port.out.CategoriaRepository;
 import com.ruandiego.mini.catalogo.application.port.out.ProdutoRepository;
@@ -26,8 +27,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Casos de uso da vitrine (só leitura). Só produtos ativos aparecem. */
-public class ConsultaCatalogoService implements BuscarProdutosUseCase, ObterProdutoUseCase, ListarCategoriasUseCase {
+/** Casos de uso de leitura: a vitrine (só produtos ativos) e a lista do admin (todos, inclusive desativados). */
+public class ConsultaCatalogoService
+        implements BuscarProdutosUseCase, ObterProdutoUseCase, ListarCategoriasUseCase, ListarProdutosAdminUseCase {
 
     private static final Collator ORDEM_ALFABETICA = Collator.getInstance(Locale.of("pt", "BR"));
 
@@ -40,7 +42,7 @@ public class ConsultaCatalogoService implements BuscarProdutosUseCase, ObterProd
     }
 
     @Override
-    public Pagina<Produto> buscar(Filtro filtro) {
+    public Pagina<Produto> buscar(BuscarProdutosUseCase.Filtro filtro) {
         Set<CategoriaId> idsCategoria = Set.of();
         if (filtro.categoria() != null) {
             Optional<Categoria> categoria = categorias.buscarPorSlug(filtro.categoria());
@@ -52,6 +54,13 @@ public class ConsultaCatalogoService implements BuscarProdutosUseCase, ObterProd
         }
         return produtos.buscar(new ProdutoRepository.Criterios(filtro.texto(), idsCategoria, filtro.precoMin(),
                 filtro.precoMax(), true, filtro.ordem(), filtro.pagina(), filtro.tamanho()));
+    }
+
+    /** Sem o filtro de ativos e sem categoria/preço: a lista de trabalho do admin, por nome. */
+    @Override
+    public Pagina<Produto> listarParaAdmin(ListarProdutosAdminUseCase.Filtro filtro) {
+        return produtos.buscar(new ProdutoRepository.Criterios(filtro.texto(), Set.of(), null, null, false,
+                BuscarProdutosUseCase.Ordem.NOME, filtro.pagina(), filtro.tamanho()));
     }
 
     @Override
