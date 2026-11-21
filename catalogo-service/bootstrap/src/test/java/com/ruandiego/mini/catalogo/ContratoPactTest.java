@@ -8,11 +8,16 @@ import au.com.dius.pact.provider.junitsupport.State;
 import au.com.dius.pact.provider.junitsupport.loader.PactFolder;
 import com.ruandiego.mini.catalogo.application.port.in.CadastrarProdutoUseCase;
 import com.ruandiego.mini.catalogo.application.port.out.CategoriaRepository;
+import com.ruandiego.mini.catalogo.application.port.out.ProdutoRepository;
 import com.ruandiego.mini.catalogo.domain.model.Categoria;
+import com.ruandiego.mini.catalogo.domain.model.CategoriaId;
 import com.ruandiego.mini.catalogo.domain.model.Imagem;
+import com.ruandiego.mini.catalogo.domain.model.Produto;
+import com.ruandiego.mini.catalogo.domain.model.ProdutoId;
 import com.ruandiego.mini.catalogo.domain.model.Sku;
 import com.ruandiego.mini.catalogo.domain.model.Slug;
 import com.ruandiego.mini.kernel.Dinheiro;
+import org.apache.hc.core5.http.HttpRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,10 +29,14 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Verificação do provider: o catalogo-service cumpre os contratos que os microfrontends gravaram em
@@ -41,7 +50,7 @@ import java.util.List;
 @Provider("catalogo-service")
 @PactFolder("../../contratos/pacts")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "catalogo.outbox.relay-ligado=false")
+        properties = {"catalogo.outbox.relay-ligado=false", "catalogo.imagens.diretorio=build/tmp/pact-imagens"})
 @Import(ContratoPactTest.Infra.class)
 class ContratoPactTest {
 
@@ -50,6 +59,8 @@ class ContratoPactTest {
 
     @Autowired
     private CategoriaRepository categorias;
+    @Autowired
+    private ProdutoRepository produtos;
     @Autowired
     private CadastrarProdutoUseCase cadastrar;
     @Autowired
@@ -62,7 +73,11 @@ class ContratoPactTest {
 
     @TestTemplate
     @ExtendWith(PactVerificationInvocationContextProvider.class)
-    void cumpreOContrato(PactVerificationContext contexto) {
+    void cumpreOContrato(PactVerificationContext contexto, HttpRequest requisicao) {
+        // O mfe-admin chama pelo caminho do gateway (base /api + /catalogo): o teste tira o prefixo, como o gateway.
+        if ("mfe-admin".equals(contexto.getConsumer().getName())) {
+            requisicao.setPath(requisicao.getPath().replaceFirst("^/catalogo(?=/)", ""));
+        }
         contexto.verifyInteraction();
     }
 
@@ -87,6 +102,26 @@ class ContratoPactTest {
     @State("não existe produto com o slug nao-existe")
     void semProduto() {
         limpar();
+    }
+
+    // ---- estados do admin (mfe-admin): ids fixos, gravados pelo port, para o contrato citá-los no caminho ----
+
+    private static final ProdutoId PRODUTO = ProdutoId.de("11111111-1111-4111-8111-111111111111");
+    private static final CategoriaId CATEGORIA = CategoriaId.de("33333333-3333-4333-8333-333333333333");
+
+    @State("existe o produto ativo esfera-chrome com o id 11111111-1111-4111-8111-111111111111")
+    void produtoComIdFixo() {
+        limpar();
+        categorias.salvar(Categoria.reconstituir(CATEGORIA, "Esferas", new Slug("esferas"), null));
+        produtos.salvar(Produto.reconstituir(PRODUTO, new Sku("ESF-CHROME-01"), "Esfera Chrome",
+                new Slug("esfera-chrome"), "Esfera de aço polido.", Dinheiro.de("289.00"),
+                List.of(new Imagem("https://cdn.mini.dev/esfera.webp", "Esfera cromada")), CATEGORIA, true));
+    }
+
+    @State("existe a categoria esferas com o id 33333333-3333-4333-8333-333333333333")
+    void categoriaComIdFixo() {
+        limpar();
+        categorias.salvar(Categoria.reconstituir(CATEGORIA, "Esferas", new Slug("esferas"), null));
     }
 
     private void esferaChrome() {
@@ -119,6 +154,17 @@ class ContratoPactTest {
         @ServiceConnection
         RabbitMQContainer rabbitmq() {
             return new RabbitMQContainer("rabbitmq:4-management");
+        }
+
+        /**
+         * `token-pact-admin` entra com o papel admin (rotas /admin); qualquer outro token é só cliente e leva 403
+         * em /admin. A validação real do JWT (assinatura, emissor) é do Keycloak e tem teste próprio.
+         */
+        @Bean
+        JwtDecoder jwtDoContrato() {
+            return token -> Jwt.withTokenValue(token).header("alg", "none").subject("contrato")
+                    .claim("realm_access", Map.of("roles", token.contains("admin") ? List.of("admin") : List.of("cliente")))
+                    .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(300)).build();
         }
     }
 }

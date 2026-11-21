@@ -123,6 +123,31 @@ class ContratoPactTest {
         salvar(PEDIDO, CLIENTE, StatusPedido.ENVIADO);
     }
 
+    // ---- estados do admin (mfe-admin) ----
+
+    @State("existe o pedido 22222222-2222-4222-8222-222222222222 pago de um cliente")
+    void pedidoPagoDeUmCliente() {
+        limpar();
+        salvar(PEDIDO, CLIENTE, StatusPedido.PAGO);
+    }
+
+    @State("existe o pedido 22222222-2222-4222-8222-222222222222 em separação")
+    void pedidoEmSeparacao() {
+        limpar();
+        salvar(PEDIDO, CLIENTE, StatusPedido.EM_SEPARACAO);
+    }
+
+    @State("existe o pedido 22222222-2222-4222-8222-222222222222 enviado")
+    void pedidoEnviadoParaOAdmin() {
+        limpar();
+        salvar(PEDIDO, CLIENTE, StatusPedido.ENVIADO);
+    }
+
+    @State("não existe o pedido 55555555-5555-4555-8555-555555555555")
+    void pedidoInexistente() {
+        limpar();
+    }
+
     /** Grava um pedido pronto pelo port (como se tivesse passado pelos status anteriores). */
     private void salvar(PedidoId id, String cliente, StatusPedido status) {
         Instant criadoEm = Instant.parse("2026-11-20T12:00:00Z");
@@ -159,12 +184,14 @@ class ContratoPactTest {
 
         /**
          * Aceita qualquer Bearer do contrato como o cliente `cliente-pact`. A validação real do JWT (assinatura,
-         * emissor) é do Keycloak e tem teste próprio; aqui interessa só o formato da API.
+         * emissor) é do Keycloak e tem teste próprio; aqui interessa só o formato da API. O papel vem do token:
+         * `token-pact-admin` ganha o papel admin (rotas /admin), qualquer outro é só cliente (o contrato do
+         * mfe-admin prova que o serviço responde 403 a quem não é admin).
          */
         @Bean
         JwtDecoder jwtDoContrato() {
             return token -> Jwt.withTokenValue(token).header("alg", "none").subject(CLIENTE)
-                    .claim("realm_access", Map.of("roles", List.of("cliente")))
+                    .claim("realm_access", Map.of("roles", token.contains("admin") ? List.of("admin") : List.of("cliente")))
                     .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(300)).build();
         }
 
